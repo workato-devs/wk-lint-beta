@@ -1,0 +1,12 @@
+name = "recipe-lint"
+version = "0.1.0"
+description = "Tiered validation for Workato recipe JSON"
+entrypoint = "./recipe-lint"
+
+[hooks]
+pre-push = "lint.pre_push"
+
+[[commands]]
+name = "lint"
+description = "Lint Workato recipe JSON files"
+method = "lint.run"
