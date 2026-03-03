@@ -1,0 +1,308 @@
+{
+  "name": "Check in guest",
+  "version": 1,
+  "private": false,
+  "concurrency": 1,
+  "code": {
+    "number": 0,
+    "provider": "workato_api_platform",
+    "name": "receive_request",
+    "as": "trigger",
+    "keyword": "trigger",
+    "dynamicPickListSelection": {
+      "response.responses.0.http_status_code": "200 - OK",
+      "response.responses.1.http_status_code": "404 - Not Found",
+      "response.responses.2.http_status_code": "409 - Conflict",
+      "response.responses.3.http_status_code": "500 - Internal Server Error"
+    },
+    "toggleCfg": {
+      "response.responses.0.http_status_code": true,
+      "response.responses.1.http_status_code": true,
+      "response.responses.2.http_status_code": true,
+      "response.responses.3.http_status_code": true
+    },
+    "input": {
+      "request": {
+        "content_type": "json",
+        "schema": "[{\"name\":\"guest_email\",\"label\":\"Guest email\",\"type\":\"string\",\"control_type\":\"text\",\"optional\":false,\"hint\":\"Guest email address\"},{\"name\":\"check_in_date\",\"label\":\"Check-in date\",\"type\":\"date\",\"control_type\":\"date\",\"optional\":true,\"hint\":\"Check-in date (ISO 8601 format, defaults to today)\"},{\"name\":\"booking_number\",\"label\":\"Booking number\",\"type\":\"string\",\"control_type\":\"text\",\"optional\":true,\"hint\":\"Booking confirmation number (optional, for disambiguation)\"},{\"name\":\"payment_id\",\"label\":\"Payment ID\",\"type\":\"string\",\"control_type\":\"text\",\"optional\":true,\"hint\":\"Stripe payment/charge ID (optional, defaults to PENDING_CHECKIN)\"}]"
+      },
+      "response": {
+        "content_type": "json",
+        "responses": [
+          {
+            "name": "Success",
+            "http_status_code": "200",
+            "body_schema": "[{\"name\":\"success\",\"label\":\"Success\",\"type\":\"boolean\",\"control_type\":\"checkbox\"},{\"name\":\"booking_number\",\"label\":\"Booking number\",\"type\":\"string\",\"control_type\":\"text\"},{\"name\":\"room_number\",\"label\":\"Room number\",\"type\":\"string\",\"control_type\":\"text\"}]"
+          },
+          {
+            "name": "Not Found",
+            "http_status_code": "404",
+            "body_schema": "[{\"name\":\"success\",\"label\":\"Success\",\"type\":\"boolean\",\"control_type\":\"checkbox\"},{\"name\":\"error_code\",\"label\":\"Error code\",\"type\":\"string\",\"control_type\":\"text\"},{\"name\":\"error_message\",\"label\":\"Error message\",\"type\":\"string\",\"control_type\":\"text\"}]"
+          },
+          {
+            "name": "Conflict",
+            "http_status_code": "409",
+            "body_schema": "[{\"name\":\"success\",\"label\":\"Success\",\"type\":\"boolean\",\"control_type\":\"checkbox\"},{\"name\":\"error_code\",\"label\":\"Error code\",\"type\":\"string\",\"control_type\":\"text\"},{\"name\":\"error_message\",\"label\":\"Error message\",\"type\":\"string\",\"control_type\":\"text\"}]"
+          },
+          {
+            "name": "Server Error",
+            "http_status_code": "500",
+            "body_schema": "[{\"name\":\"success\",\"label\":\"Success\",\"type\":\"boolean\",\"control_type\":\"checkbox\"},{\"name\":\"error_code\",\"label\":\"Error code\",\"type\":\"string\",\"control_type\":\"text\"},{\"name\":\"error_message\",\"label\":\"Error message\",\"type\":\"string\",\"control_type\":\"text\"}]"
+          }
+        ]
+      }
+    },
+    "extended_output_schema": [
+      {
+        "label": "Request parameters",
+        "name": "request",
+        "properties": [
+          {
+            "control_type": "text",
+            "label": "Guest email",
+            "name": "guest_email",
+            "type": "string",
+            "optional": false,
+            "hint": "Guest email address"
+          },
+          {
+            "control_type": "date",
+            "label": "Check-in date",
+            "render_input": "date_conversion",
+            "parse_output": "date_conversion",
+            "name": "check_in_date",
+            "type": "date",
+            "optional": true,
+            "hint": "Check-in date (ISO 8601 format, defaults to today)"
+          },
+          {
+            "control_type": "text",
+            "label": "Booking number",
+            "name": "booking_number",
+            "type": "string",
+            "optional": true,
+            "hint": "Booking confirmation number (optional, for disambiguation)"
+          },
+          {
+            "control_type": "text",
+            "label": "Payment ID",
+            "name": "payment_id",
+            "type": "string",
+            "optional": true,
+            "hint": "Stripe payment/charge ID (optional, defaults to PENDING_CHECKIN)"
+          }
+        ],
+        "type": "object"
+      }
+    ],
+    "block": [
+      {
+        "number": 1,
+        "keyword": "try",
+        "input": {
+        },
+        "block": [
+          {
+            "number": 2,
+            "provider": "workato_recipe_function",
+            "name": "call_recipe",
+            "as": "search_contact",
+            "keyword": "action",
+            "dynamicPickListSelection": {
+              "flow_id": "Search contact by email"
+            },
+            "input": {
+              "flow_id": {
+                "zip_name": "atomic-salesforce-recipes/search_contact_by_email.recipe.json",
+                "name": "Search contact by email",
+                "folder": "atomic-salesforce-recipes",
+                "folder_full_path": "Home/atomic-salesforce-recipes"
+              },
+              "parameters": {
+                "email": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_api_platform\",\"line\":\"trigger\",\"path\":[\"request\",\"guest_email\"]}')}"
+              }
+            },
+            "extended_output_schema": [
+              {
+                "label": "Result",
+                "name": "result",
+                "properties": [
+                  {
+                    "control_type": "text",
+                    "label": "Contact ID",
+                    "name": "id",
+                    "type": "string"
+                  },
+                  {
+                    "control_type": "checkbox",
+                    "label": "Found",
+                    "name": "found",
+                    "type": "boolean"
+                  }
+                ],
+                "type": "object"
+              }
+            ],
+            "uuid": "search-contact-checkin-001"
+          },
+          {
+            "number": 3,
+            "as": "check-guest-found-001",
+            "keyword": "if",
+            "input": {
+              "type": "compound",
+              "operand": "and",
+              "conditions": [
+                {
+                  "operand": "equals_to",
+                  "lhs": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_recipe_function\",\"line\":\"search_contact\",\"path\":[\"result\",\"found\"]}')}",
+                  "rhs": "false",
+                  "uuid": "guest-not-found-condition-001"
+                }
+              ]
+            },
+            "block": [
+              {
+                "number": 4,
+                "provider": "workato_api_platform",
+                "name": "return_response",
+                "as": "return_guest_not_found",
+                "keyword": "action",
+                "input": {
+                  "http_status_code": "404",
+                  "response": {
+                    "success": "false",
+                    "error_code": "GUEST_NOT_FOUND",
+                    "error_message": "Guest not found"
+                  }
+                },
+                "uuid": "return-guest-not-found-001"
+              }
+            ],
+            "uuid": "check-guest-found-001"
+          },
+          {
+            "number": 5,
+            "provider": "workato_recipe_function",
+            "name": "call_recipe",
+            "as": "search_booking",
+            "keyword": "action",
+            "input": {
+              "flow_id": {
+                "zip_name": "atomic-salesforce-recipes/search_booking_by_contact_and_date.recipe.json",
+                "name": "Search booking by contact and date",
+                "folder": "atomic-salesforce-recipes"
+              },
+              "parameters": {
+                "contact_id": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_recipe_function\",\"line\":\"search_contact\",\"path\":[\"result\",\"id\"]}')}",
+                "check_in_date": "=_dp('{\"pill_type\":\"output\",\"provider\":\"workato_api_platform\",\"line\":\"trigger\",\"path\":[\"request\",\"check_in_date\"]}').present? ? _dp('{\"pill_type\":\"output\",\"provider\":\"workato_api_platform\",\"line\":\"trigger\",\"path\":[\"request\",\"check_in_date\"]}') : now.to_date",
+                "status": "Reserved"
+              }
+            },
+            "uuid": "search-booking-001"
+          },
+          {
+            "number": 6,
+            "provider": "workato_recipe_function",
+            "name": "call_recipe",
+            "as": "update_booking_status",
+            "keyword": "action",
+            "input": {
+              "flow_id": {
+                "zip_name": "atomic-salesforce-recipes/update_booking_status.recipe.json",
+                "name": "Update booking status",
+                "folder": "atomic-salesforce-recipes"
+              },
+              "parameters": {
+                "booking_id": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_recipe_function\",\"line\":\"search_booking\",\"path\":[\"result\",\"bookings\",{\"path_element_type\":\"current_item\"},\"booking_id\"]}')}",
+                "status": "Checked In",
+                "checkout_date": "=now.to_date"
+              }
+            },
+            "uuid": "update-booking-status-001"
+          },
+          {
+            "number": 7,
+            "provider": "workato_api_platform",
+            "name": "return_response",
+            "as": "return_success",
+            "keyword": "action",
+            "input": {
+              "http_status_code": "200",
+              "response": {
+                "success": "true",
+                "booking_number": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_recipe_function\",\"line\":\"search_booking\",\"path\":[\"result\",\"bookings\",{\"path_element_type\":\"current_item\"},\"booking_number\"]}')}",
+                "room_number": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"workato_recipe_function\",\"line\":\"search_booking\",\"path\":[\"result\",\"bookings\",{\"path_element_type\":\"current_item\"},\"room_number\"]}')}"
+              }
+            },
+            "uuid": "return-success-checkin-001"
+          },
+          {
+            "number": 8,
+            "provider": null,
+            "name": "catch",
+            "as": "checkin_catch",
+            "keyword": "catch",
+            "input": {
+              "max_retry_count": "0",
+              "retry_interval": "2"
+            },
+            "block": [
+              {
+                "number": 9,
+                "provider": "logger",
+                "name": "log_message",
+                "as": "log_checkin_error",
+                "keyword": "action",
+                "input": {
+                  "message": "Error during check-in: #{_dp('{\"pill_type\":\"output\",\"provider\":\"catch\",\"line\":\"checkin_catch\",\"path\":[\"message\"]}')}",
+                  "user_logs_enabled": "false"
+                },
+                "uuid": "log-checkin-error-001"
+              },
+              {
+                "number": 10,
+                "provider": "workato_api_platform",
+                "name": "return_response",
+                "as": "return_server_error",
+                "keyword": "action",
+                "input": {
+                  "http_status_code": "500",
+                  "response": {
+                    "success": "false",
+                    "error_code": "INTERNAL_ERROR",
+                    "error_message": "An unexpected error occurred during check-in"
+                  }
+                },
+                "uuid": "return-server-error-001"
+              }
+            ],
+            "uuid": "checkin-catch-001"
+          }
+        ],
+        "uuid": "checkin-try-001"
+      }
+    ],
+    "uuid": "checkin-trigger-001"
+  },
+  "config": [
+    {
+      "keyword": "application",
+      "provider": "workato_api_platform",
+      "skip_validation": false,
+      "account_id": null
+    },
+    {
+      "keyword": "application",
+      "provider": "workato_recipe_function",
+      "skip_validation": false,
+      "account_id": null
+    },
+    {
+      "keyword": "application",
+      "provider": "logger",
+      "skip_validation": false,
+      "account_id": null
+    }
+  ]
+}

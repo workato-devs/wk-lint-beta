@@ -1,0 +1,34 @@
+{
+  "name": "Bad recipe",
+  "version": 1,
+  "private": true,
+  "concurrency": 1,
+  "code": {
+    "number": 0,
+    "keyword": "trigger",
+    "provider": "workato_api_platform",
+    "name": "receive_request",
+    "as": "trigger",
+    "uuid": "trigger-001",
+    "input": {},
+    "block": [
+      {
+        "keyword": "action",
+        "provider": "salesforce",
+        "name": "create",
+        "as": "step_no_number",
+        "uuid": "this-uuid-is-way-too-long-and-exceeds-the-thirty-six-character-limit-for-uuids",
+        "input": {}
+      },
+      {
+        "number": "2",
+        "keyword": "action",
+        "provider": "salesforce",
+        "name": "update",
+        "as": "step_number_string",
+        "input": {}
+      }
+    ]
+  },
+  "config": "not_an_array"
+}

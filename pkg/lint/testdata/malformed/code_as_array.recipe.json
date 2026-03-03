@@ -1,0 +1,8 @@
+{
+  "name": "Array code",
+  "version": 1,
+  "private": true,
+  "concurrency": 1,
+  "code": [{"keyword": "trigger", "number": 0}],
+  "config": [{"keyword": "application", "provider": "test"}]
+}
