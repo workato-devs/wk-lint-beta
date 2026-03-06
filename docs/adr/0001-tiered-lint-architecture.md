@@ -132,6 +132,7 @@ This is the tier where the **false negatives live**. Datapill syntax rules, `lhs
 | `FILENAME_MATCH` | Filename matches `name` field (lowercase, underscores) | SKILL_INSTRUCTIONS |
 | `CONFIG_NO_WORKATO` | `config` array does not include `workato` provider | base validation-checklist |
 | `CONFIG_PROVIDER_MATCH` | Every `provider` used in actions has a matching `config` entry | base validation-checklist |
+| `ACTION_NAME_VALID` | Action `name` is in the allowed set for its `provider` (via `valid_action_names` in connector rules) | TODO Rule 1 |
 | `CONFIG_NOT_IN_ACTION` | No action block contains a `config` key | SKILL_INSTRUCTIONS |
 | `IF_NO_PROVIDER` | `if` blocks have no `provider` field | if-else.md |
 | `ELSE_NO_PROVIDER` | `else` blocks have no `provider` field | if-else.md |
@@ -671,6 +672,7 @@ type ConnectorRules struct {
     Version            string       `json:"version"`
     Connector          string       `json:"connector"`
     ConnectorInternals []string     `json:"connector_internals"`
+    ValidActionNames   []string     `json:"valid_action_names,omitempty"`
     ActionRules        []ActionRule `json:"action_rules"`
 }
 
@@ -693,6 +695,24 @@ func LoadConnectorRules(skillsPath string) (map[string]*ConnectorRules, error) {
 ```
 
 Adding a new connector's lint rules means adding a `lint-rules.json` file — no Go code changes, no recompilation, no new CLI release. The plugin bundles its own `rules/` directory and can also load from `--skills-path`.
+
+### `valid_action_names` — Provider Action Validation (Amendment, March 2026)
+
+The `valid_action_names` field on `ConnectorRules` lists the allowed action names for a provider. When present and non-empty, the `ACTION_NAME_VALID` rule checks that every step using that provider has a `name` matching one of the allowed values. If absent or empty, the rule is skipped for that provider.
+
+Example for the `rest` connector:
+
+```json
+{
+  "version": "0.1.0",
+  "connector": "rest",
+  "valid_action_names": ["make_request_v2"],
+  "connector_internals": [],
+  "action_rules": []
+}
+```
+
+**Decision: static file, not API.** Provider-to-action mappings are shipped as static JSON data in `lint-rules.json` files. They are not fetched from the Workato API at lint time. This is consistent with the zero-network-dependency principle: "No runtime dependencies beyond the `wk` binary and the installed plugin." Mappings are updated by updating the connector's `lint-rules.json` file.
 
 ---
 

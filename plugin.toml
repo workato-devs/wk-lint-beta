@@ -10,3 +10,23 @@ pre-push = "lint.pre_push"
 name = "lint"
 description = "Lint Workato recipe JSON files"
 method = "lint.run"
+
+[[commands.args]]
+name = "files"
+description = "Recipe files to lint"
+required = true
+
+[[commands.flags]]
+name = "skills-path"
+description = "Path to connector skills directory"
+type = "string"
+
+[[commands.flags]]
+name = "config-path"
+description = "Path to lint configuration file"
+type = "string"
+
+[[commands.flags]]
+name = "tiers"
+description = "Lint tier levels to run"
+type = "int-array"

@@ -30,6 +30,7 @@ func lintTier1Steps(parsed *recipe.ParsedRecipe, filename string, connRules map[
 	diags = append(diags, checkFilenameMatch(parsed, filename)...)
 	diags = append(diags, checkConfigNoWorkato(parsed)...)
 	diags = append(diags, checkConfigProviderMatch(parsed, connRules)...)
+	diags = append(diags, checkActionNameValid(parsed, connRules)...)
 	diags = append(diags, checkControlFlowRules(parsed)...)
 	diags = append(diags, checkNoElsif(parsed)...)
 	diags = append(diags, checkResponseCodesDefined(parsed)...)
@@ -334,6 +335,47 @@ func checkNoElsif(parsed *recipe.ParsedRecipe) []LintDiagnostic {
 				Message: "\"elsif\" keyword is not allowed; use nested if/else instead",
 				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/keyword"},
 				RuleID:  "NO_ELSIF",
+				Tier:    1,
+			})
+		}
+	}
+	return diags
+}
+
+// checkActionNameValid verifies that action names are valid for their provider.
+func checkActionNameValid(parsed *recipe.ParsedRecipe, connRules map[string]*ConnectorRules) []LintDiagnostic {
+	var diags []LintDiagnostic
+	if len(connRules) == 0 {
+		return diags
+	}
+	for _, step := range parsed.Steps {
+		if step.Code.Provider == nil || *step.Code.Provider == "" {
+			continue
+		}
+		if step.Code.Name == "" {
+			continue
+		}
+		provider := *step.Code.Provider
+		cr, ok := connRules[provider]
+		if !ok {
+			continue
+		}
+		if len(cr.ValidActionNames) == 0 {
+			continue
+		}
+		valid := false
+		for _, name := range cr.ValidActionNames {
+			if step.Code.Name == name {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			diags = append(diags, LintDiagnostic{
+				Level:   LevelError,
+				Message: fmt.Sprintf("Action name %q is not valid for provider %q; expected one of %v", step.Code.Name, provider, cr.ValidActionNames),
+				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/name"},
+				RuleID:  "ACTION_NAME_VALID",
 				Tier:    1,
 			})
 		}

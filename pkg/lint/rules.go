@@ -11,6 +11,7 @@ type ConnectorRules struct {
 	Version            string       `json:"version"`
 	Connector          string       `json:"connector"`
 	ConnectorInternals []string     `json:"connector_internals"`
+	ValidActionNames   []string     `json:"valid_action_names,omitempty"`
 	ActionRules        []ActionRule `json:"action_rules"`
 }
 

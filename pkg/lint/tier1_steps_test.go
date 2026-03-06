@@ -438,6 +438,87 @@ func TestTier1_ResponseCodesDefined_NonAPIPlatform(t *testing.T) {
 	}
 }
 
+func TestTier1_ActionNameValid_Pass(t *testing.T) {
+	connRules := map[string]*ConnectorRules{
+		"rest": {ValidActionNames: []string{"make_request_v2"}},
+	}
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("rest"), Name: "make_request_v2"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, connRules)
+	if hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected no ACTION_NAME_VALID for valid action name")
+	}
+}
+
+func TestTier1_ActionNameValid_Fail(t *testing.T) {
+	connRules := map[string]*ConnectorRules{
+		"rest": {ValidActionNames: []string{"make_request_v2"}},
+	}
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("rest"), Name: "__adhoc_http_action"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, connRules)
+	if !hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected ACTION_NAME_VALID for invalid action name")
+	}
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+	if diags[0].Level != LevelError {
+		t.Errorf("expected error level, got %s", diags[0].Level)
+	}
+}
+
+func TestTier1_ActionNameValid_NoRulesForProvider(t *testing.T) {
+	connRules := map[string]*ConnectorRules{
+		"rest": {ValidActionNames: []string{"make_request_v2"}},
+	}
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("salesforce"), Name: "search_sobjects"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, connRules)
+	if hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected no ACTION_NAME_VALID when provider has no rules")
+	}
+}
+
+func TestTier1_ActionNameValid_EmptyValidList(t *testing.T) {
+	connRules := map[string]*ConnectorRules{
+		"rest": {ValidActionNames: []string{}},
+	}
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("rest"), Name: "anything"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, connRules)
+	if hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected no ACTION_NAME_VALID when valid_action_names is empty")
+	}
+}
+
+func TestTier1_ActionNameValid_NilConnRules(t *testing.T) {
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("rest"), Name: "__adhoc_http_action"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, nil)
+	if hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected no ACTION_NAME_VALID when connRules is nil")
+	}
+}
+
+func TestTier1_ActionNameValid_NoNameField(t *testing.T) {
+	connRules := map[string]*ConnectorRules{
+		"rest": {ValidActionNames: []string{"make_request_v2"}},
+	}
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", Provider: strPtr("rest")}, JSONPointer: "/code/block/0"},
+	}, nil)
+	diags := checkActionNameValid(parsed, connRules)
+	if hasDiag(diags, "ACTION_NAME_VALID") {
+		t.Error("expected no ACTION_NAME_VALID when step has no name")
+	}
+}
+
 func TestTier1_FullIntegration(t *testing.T) {
 	provider := "salesforce"
 	parsed := buildParsedRecipe("Test Recipe", []recipe.FlatStep{
