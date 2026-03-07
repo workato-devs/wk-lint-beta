@@ -52,7 +52,8 @@
       "to_currency_symbol",
       "to_phone",
       "to_state_code",
-      "to_state_name"
+      "to_state_name",
+      "encode_url"
     ],
     "number": [
       "abs",
