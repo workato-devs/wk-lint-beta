@@ -40,6 +40,8 @@ type lintRunParams struct {
 	SkillsPath string   `json:"skills_path"`
 	ConfigPath string   `json:"config_path"`
 	Tiers      []int    `json:"tiers"`
+	Profile    string   `json:"profile"`
+	PluginDir  string   `json:"plugin_dir"`
 }
 
 type fileDiagnostics struct {
@@ -63,6 +65,8 @@ type lintRunResult struct {
 type prePushParams struct {
 	ProjectRoot string   `json:"project_root"`
 	Files       []string `json:"files"`
+	Profile     string   `json:"profile"`
+	PluginDir   string   `json:"plugin_dir"`
 }
 
 type prePushDiagnostic struct {
@@ -179,6 +183,8 @@ func handleLintRun(req RPCRequest) RPCResponse {
 			SkillsPath: params.SkillsPath,
 			ConfigPath: params.ConfigPath,
 			Filename:   file,
+			Profile:    params.Profile,
+			PluginDir:  params.PluginDir,
 		}
 
 		diags, err := lint.LintRecipe(data, opts)
@@ -281,7 +287,9 @@ func handlePrePush(req RPCRequest) RPCResponse {
 		}
 
 		opts := lint.LintOptions{
-			Filename: file,
+			Filename:  file,
+			Profile:   params.Profile,
+			PluginDir: params.PluginDir,
 		}
 
 		diags, err := lint.LintRecipe(data, opts)

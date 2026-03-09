@@ -1,7 +1,7 @@
 # Recipe Linter: Tiered Validation for Workato Recipe JSON
 
 **Author:** Zayne Turner
-**Status:** Approved — Ready to Build
+**Status:** Accepted — Partially Implemented (Tiers 0 + 1a)
 **Date:** February 23, 2026 (original) · March 2, 2026 (amendments incorporated)
 
 ---

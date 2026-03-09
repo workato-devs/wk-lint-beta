@@ -30,3 +30,8 @@ type = "string"
 name = "tiers"
 description = "Lint tier levels to run"
 type = "int-array"
+
+[[commands.flags]]
+name = "profile"
+description = "Lint profile to use (overrides .wklintrc.json)"
+type = "string"

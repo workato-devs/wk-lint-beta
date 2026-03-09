@@ -1,0 +1,12 @@
+{
+  "name": "standard",
+  "description": "Baseline lint profile — most rules emit warnings",
+  "rules": {
+    "INVALID_JSON": "error",
+    "SCHEMA_MISSING_CODE": "error",
+    "SCHEMA_MISSING_CONFIG": "error",
+    "ACTION_NAME_VALID": "warning",
+    "FORMULA_METHOD_INVALID": "warning",
+    "FORMULA_FORBIDDEN_PATTERN": "warning"
+  }
+}

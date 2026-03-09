@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"path/filepath"
+
 	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
 )
 
@@ -10,6 +12,8 @@ type LintOptions struct {
 	SkillsPath string
 	ConfigPath string
 	Filename   string
+	Profile    string
+	PluginDir  string
 }
 
 // LintRecipe lints raw recipe JSON bytes and returns diagnostics.
@@ -20,7 +24,29 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		return nil, err
 	}
 
-	// 2. Check ShouldIgnoreFile
+	// 2. Resolve profile (CLI flag > config file > none)
+	profileName := opts.Profile
+	if profileName == "" && cfg != nil {
+		profileName = cfg.Profile
+	}
+
+	var resolvedProfile *ResolvedProfile
+	if profileName != "" {
+		projectRoot := ""
+		if opts.ConfigPath != "" {
+			projectRoot = filepath.Dir(opts.ConfigPath)
+		}
+		discovered, err := discoverProfiles(projectRoot, opts.PluginDir)
+		if err != nil {
+			return nil, err
+		}
+		resolvedProfile, err = resolveProfileChain(profileName, discovered)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// 3. Check ShouldIgnoreFile
 	if cfg != nil && cfg.ShouldIgnoreFile(opts.Filename) {
 		return nil, nil
 	}
@@ -38,12 +64,12 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 
 	var diags []LintDiagnostic
 
-	// 3. Run Tier 0 if requested
+	// 4. Run Tier 0 if requested
 	if tierSet[0] {
 		tier0Diags := lintTier0(data)
 		diags = append(diags, tier0Diags...)
 
-		// 4. If tier 0 has errors, stop
+		// 5. If tier 0 has errors, stop
 		hasErrors := false
 		for _, d := range tier0Diags {
 			if d.Level == LevelError {
@@ -52,61 +78,73 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 			}
 		}
 		if hasErrors {
-			diags = applyCfgOverrides(diags, cfg)
-			return filterOff(diags, cfg), nil
+			diags = applyOverrides(diags, resolvedProfile, cfg)
+			return filterOff(diags), nil
 		}
 	}
 
-	// 5. Parse recipe
+	// 6. Parse recipe
 	parsed, err := recipe.Parse(data)
 	if err != nil {
 		return diags, err
 	}
 
-	// 6. Load connector rules
+	// 7. Load connector rules
 	connRules, err := LoadConnectorRules(opts.SkillsPath)
 	if err != nil {
 		return diags, err
 	}
 
-	// 7. Run Tier 1 if requested
+	// 8. Run Tier 1 if requested
 	if tierSet[1] {
 		tier1Diags := lintTier1Steps(parsed, opts.Filename, connRules)
 		diags = append(diags, tier1Diags...)
 	}
 
-	// 8. Apply config severity overrides
-	diags = applyCfgOverrides(diags, cfg)
+	// 9. Apply overrides (profile first, then config)
+	diags = applyOverrides(diags, resolvedProfile, cfg)
 
-	// 9. Filter out "off" rules
-	diags = filterOff(diags, cfg)
+	// 10. Filter out "off" rules
+	diags = filterOff(diags)
 
-	// 10. Return
 	return diags, nil
 }
 
-// applyCfgOverrides applies config severity overrides to diagnostics.
-func applyCfgOverrides(diags []LintDiagnostic, cfg *LintConfig) []LintDiagnostic {
-	if cfg == nil {
-		return diags
-	}
+// applyOverrides applies severity overrides in order: profile layer first,
+// then .wklintrc.json layer (config always wins over profile).
+func applyOverrides(diags []LintDiagnostic, profile *ResolvedProfile, cfg *LintConfig) []LintDiagnostic {
 	for i := range diags {
-		eff := cfg.EffectiveSeverity(diags[i].RuleID, diags[i].Level)
-		diags[i].Level = eff
+		level := diags[i].Level
+
+		// Layer 1: profile overrides
+		if profile != nil {
+			if v, ok := profile.Rules[diags[i].RuleID]; ok {
+				level = v
+			}
+		}
+
+		// Layer 2: config overrides (highest priority)
+		if cfg != nil {
+			if v, ok := cfg.Rules[diags[i].RuleID]; ok {
+				level = v
+			}
+		}
+
+		diags[i].Level = level
 	}
 	return diags
 }
 
 // filterOff removes diagnostics whose level is "off".
-func filterOff(diags []LintDiagnostic, cfg *LintConfig) []LintDiagnostic {
-	if cfg == nil {
-		return diags
-	}
+func filterOff(diags []LintDiagnostic) []LintDiagnostic {
 	var filtered []LintDiagnostic
 	for _, d := range diags {
 		if d.Level != "off" {
 			filtered = append(filtered, d)
 		}
+	}
+	if filtered == nil {
+		return diags[:0]
 	}
 	return filtered
 }

@@ -9,6 +9,7 @@ import (
 // LintConfig holds user-level lint configuration loaded from .wklintrc.json.
 type LintConfig struct {
 	Version     string            `json:"version"`
+	Profile     string            `json:"profile,omitempty"`
 	Rules       map[string]string `json:"rules"`
 	IgnoreFiles []string          `json:"ignore_files"`
 }

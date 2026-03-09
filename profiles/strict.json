@@ -1,0 +1,10 @@
+{
+  "name": "strict",
+  "description": "Strict lint profile — escalates key rules to errors",
+  "extends": "standard",
+  "rules": {
+    "ACTION_NAME_VALID": "error",
+    "FORMULA_METHOD_INVALID": "error",
+    "FORMULA_FORBIDDEN_PATTERN": "error"
+  }
+}
