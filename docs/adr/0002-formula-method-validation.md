@@ -1,15 +1,16 @@
 # Formula Method Validation
 
 **Author:** Zayne Turner
-**Status:** Draft
+**Status:** Implemented
 **Date:** March 6, 2026
+**Implemented:** March 9, 2026
 **References:** ADR 0001 (Tiered Lint Architecture)
 
 ---
 
 ## Context
 
-Testing identified invalid formula method patterns in recipe `input` fields (see `docs/TODO.md`, Rule 2). For example, `now.utc` is a Ruby method that does not exist in Workato's formula language; the correct equivalent is `now.in_time_zone("UTC")`.
+Testing identified invalid formula method patterns in recipe `input` fields. For example, `now.utc` is a Ruby method that does not exist in Workato's formula language; the correct equivalent is `now.in_time_zone("UTC")`.
 
 This is architecturally distinct from datapill validation (Tier 1b): datapill rules validate `_dp()` reference correctness, while formula method validation checks that Ruby/Workato method calls within string values are correct. Both require scanning string values in `input` fields, but the concerns and pattern registries are separate.
 
@@ -56,13 +57,13 @@ The recipe skill should reference or embed this allowlist so agents generate onl
 | `FORMULA_METHOD_INVALID` | Method call uses a method not in the Workato formula allowlist |
 | `FORMULA_FORBIDDEN_PATTERN` | Value matches a known-forbidden pattern (with specific suggestion) |
 
-`FORMULA_FORBIDDEN_PATTERN` fires first and provides targeted suggestions (e.g., "use `in_time_zone` instead of `.utc`"). `FORMULA_METHOD_INVALID` is the catch-all for any method not in the allowlist.
+`FORMULA_FORBIDDEN_PATTERN` fires first and provides targeted suggestions (e.g., "use `in_time_zone` instead of `.utc`"). Methods already covered by a forbidden pattern are suppressed from `FORMULA_METHOD_INVALID` to avoid duplicate noise. Both rules emit at `LevelWarn`, Tier 1.
 
 ### Rule Category Placement
 
-Formula method validation is a sub-category of Tier 1b, alongside the datapill walker. Both share the string-walking infrastructure (`walkAllStrings` from `pkg/recipe/walk.go`), but formula method rules use a separate registry and produce distinct rule IDs prefixed with `FORMULA_`.
+Formula method validation is a sub-category of Tier 1b. It uses the generic string-walking infrastructure (`WalkStrings` from `pkg/recipe/walk.go`) but is wired as an independent check function in `lintTier1Steps`, consistent with every other Tier 1 rule. Formula rules use a separate registry and produce distinct rule IDs prefixed with `FORMULA_`.
 
-### Method extraction: simple tokenizer, not full parser
+### Method extraction: character-level scanner
 
 Formula method validation requires extracting method calls from formula strings. Workato formulas are `=`-prefixed strings with Ruby-like method chaining:
 
@@ -72,49 +73,43 @@ Formula method validation requires extracting method calls from formula strings.
 =items.where(status: 'active').pluck('name').join(', ')
 ```
 
-The extractor needs to:
-1. Identify `=`-prefixed strings (formula mode)
-2. Extract `.method_name` calls (dotted identifiers)
-3. Check each method name against the allowlist
+A naive split-on-dot approach would false-positive on dots inside `_dp('{a.b.c}')` datapill payloads and string literals. The extractor is a character-level scanner that:
 
-This is a simple tokenizer (split on `.`, strip arguments), not a full expression parser. It doesn't need to understand operator precedence, nesting, or evaluation — just extract the method names being called.
+1. Strips the leading `=`
+2. Skips `_dp('...')` datapill payloads (which contain dots that aren't method calls)
+3. Skips `'...'` string literals
+4. Skips `(...)` parenthesized arguments with depth tracking
+5. On `.`, reads the subsequent identifier (`[a-z_][a-z0-9_]*\??`) as a method name
 
 ```go
-// extractMethods returns all .method_name calls from a formula string.
-// Input: "=_dp('{...}').strip.downcase"
-// Output: ["strip", "downcase"]
 func extractMethods(formula string) []string
 ```
 
-Edge cases to handle:
-- `_dp(...)` is not a method call (it's a datapill reference, handled by Tier 1b)
-- Bracket notation `['key']` is not a method call
-- Ternary `? :` operators are not method calls
-- Arguments in parentheses `strftime('%Y')` — extract `strftime`, ignore args
+Edge cases handled:
+- `_dp('{a.b.c}')` — dots inside datapills are not method calls
+- `'text.with.dots'` — dots inside string literals are not method calls
+- `present?` — trailing `?` is part of the method name
+- Nested parentheses — `gsub(/[^0-9]/, '').to_i` correctly skips the regex argument
+- Ternary `? :` — not confused with `?`-suffix methods
 
-### Relationship to Tier 1b Walker
+### Independent checks, not shared walker callbacks
 
-Formula method validation runs as a callback within the same `walkAllStrings` traversal used by the datapill walker:
+The original design envisioned formula and datapill validation as callbacks within a single shared `walkAllStrings` traversal. The implementation instead has each check own its own `WalkStrings` call, consistent with how all other Tier 1 checks work.
 
-```
-walkAllStrings(recipe)
-  -> for each string value:
-     -> lintDatapills(value, ctx)      // Tier 1b datapill rules
-     -> lintFormulaMethods(value, ctx)  // Tier 1b formula rules
-```
-
-This avoids duplicate traversal while keeping the rule implementations independent.
+This is the right tradeoff: walking JSON strings is cheap (small payloads, no I/O), and coupling unrelated checks into a shared traversal adds complexity for negligible performance benefit. Each check is self-contained and independently testable. When the datapill walker is added, it should also call `WalkStrings` independently rather than sharing a traversal with formula validation.
 
 ## Implementation
 
-### Phase 2 Deliverables
+### Delivered files
 
-| Deliverable | Description |
+| File | Description |
 |---|---|
-| `pkg/lint/formulas.json` | Allowlist data file (created) |
-| `pkg/lint/tier1_formulas.go` | Allowlist loader, method extractor, `lintFormulaMethods()` |
-| `pkg/lint/tier1_formulas_test.go` | Test cases for extraction + validation |
-| Integration with `walkAllStrings` | Callback registration in `pkg/recipe/walk.go` |
+| `pkg/recipe/walk.go` | Generic `WalkStrings` — recursively walks `json.RawMessage`, calls visitor for every string leaf with JSON pointer path |
+| `pkg/recipe/walk_test.go` | Walker tests: flat objects, nested objects, arrays, mixed types, nil/empty |
+| `pkg/lint/formulas.json` | Allowlist data file (embedded via `//go:embed`) |
+| `pkg/lint/tier1_formulas.go` | Allowlist loader (`init()`), `extractMethods` tokenizer, `lintFormulaString`, `checkFormulaMethods` |
+| `pkg/lint/tier1_formulas_test.go` | Tokenizer tests (12 cases), validation tests (6 cases), integration + fixture regression tests |
+| `pkg/lint/tier1_steps.go` | One-line wiring: `checkFormulaMethods(parsed)` added to `lintTier1Steps` |
 
 ### Skill update (separate repo)
 
@@ -125,16 +120,12 @@ The recipe skill (`recipe-skills/`) should be updated to:
 
 This is a skill content change, not a linter change, tracked separately.
 
-### Dependencies
-
-- **Blocks on:** `pkg/recipe/walk.go` (the generic string walker, planned for Phase 2)
-- **Does not block:** any other Phase 1 or Phase 2 work
-
 ## Consequences
 
 - **Systematic coverage:** Any invalid method is caught, not just known-bad patterns. Novel hallucinations from Ruby training data are caught on first occurrence.
 - **Defense in depth:** Skill constrains generation + linter enforces allowlist + activation is last resort. Invalid formulas should rarely reach Workato.
 - **Stable maintenance:** The allowlist (~120 methods) changes only when Workato adds or removes formula support. This is infrequent and documented in their changelog.
-- **Specific suggestions preserved:** The `forbidden_patterns` list provides targeted error messages for common mistakes (e.g., `now.utc`), layered on top of the generic allowlist check.
+- **Specific suggestions preserved:** The `forbidden_patterns` list provides targeted error messages for common mistakes (e.g., `now.utc`), layered on top of the generic allowlist check. Forbidden pattern matches suppress duplicate allowlist findings for the same methods.
 - **Shared source of truth:** `formulas.json` is used by both the linter and the skill, preventing drift between what's taught and what's enforced.
-- **Tokenizer complexity:** The method extractor is simple but not trivial — edge cases around `_dp()`, bracket notation, and ternary operators need test coverage.
+- **Scanner complexity:** The method extractor is a character-level scanner, not a simple string split. This is necessary to correctly handle `_dp()` payloads, string literals, and nested parentheses without false positives. The complexity is justified and well-covered by tests (~12 tokenizer cases).
+- **Reusable walker:** `pkg/recipe/walk.go` provides `WalkStrings` as generic infrastructure. Future checks (datapill validation, EIS checking) can use it independently without coupling to formula validation.

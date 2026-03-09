@@ -6,3 +6,6 @@
 *.test
 *.out
 .DS_Store
+
+#Development artifacts
+*TODO.md
