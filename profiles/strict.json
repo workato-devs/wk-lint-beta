@@ -5,6 +5,10 @@
   "rules": {
     "ACTION_NAME_VALID": "error",
     "FORMULA_METHOD_INVALID": "error",
-    "FORMULA_FORBIDDEN_PATTERN": "error"
+    "FORMULA_FORBIDDEN_PATTERN": "error",
+    "DP_VALID_JSON": "error",
+    "DP_LHS_NO_FORMULA": "error",
+    "EIS_MIRRORS_INPUT": "error",
+    "EIS_NAME_MATCH": "error"
   }
 }

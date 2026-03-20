@@ -7,6 +7,18 @@
     "SCHEMA_MISSING_CONFIG": "error",
     "ACTION_NAME_VALID": "warning",
     "FORMULA_METHOD_INVALID": "warning",
-    "FORMULA_FORBIDDEN_PATTERN": "warning"
+    "FORMULA_FORBIDDEN_PATTERN": "warning",
+    "DP_VALID_JSON": "error",
+    "DP_LHS_NO_FORMULA": "error",
+    "DP_INTERPOLATION_SINGLE": "warning",
+    "DP_FORMULA_CONCAT": "warning",
+    "DP_NO_OUTER_PARENS": "info",
+    "DP_NO_BODY_NATIVE": "warning",
+    "DP_CATCH_PROVIDER": "warning",
+    "EIS_MIRRORS_INPUT": "warning",
+    "EIS_NESTED_MATCH": "warning",
+    "EIS_NAME_MATCH": "warning",
+    "EIS_NO_CONNECTOR_INTERNAL": "warning",
+    "EIS_OUTPUT_MIRRORS_INPUT": "info"
   }
 }

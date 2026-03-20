@@ -1,0 +1,113 @@
+{
+  "name": "Datapill edge cases",
+  "version": 1,
+  "private": true,
+  "concurrency": 1,
+  "code": {
+    "number": 0,
+    "provider": "workato_recipe_function",
+    "name": "execute",
+    "as": "trigger",
+    "keyword": "trigger",
+    "uuid": "datapill-trigger",
+    "input": {
+      "parameters_schema_json": "[{\"name\":\"record_id\",\"label\":\"Record ID\",\"type\":\"string\"}]"
+    },
+    "block": [
+      {
+        "number": 1,
+        "keyword": "try",
+        "uuid": "try-block",
+        "as": "",
+        "input": {},
+        "block": [
+          {
+            "number": 2,
+            "provider": "salesforce",
+            "name": "search_sobjects",
+            "keyword": "action",
+            "uuid": "search-salesforce",
+            "input": {
+              "sobject_name": "Account",
+              "query": "=_dp('{\"pill_type\":\"output\",\"provider\":\"salesforce\",\"line\":\"trigger\",\"path\":[\"parameters\",\"record_id\"]}').present? ? _dp('{\"pill_type\":\"output\",\"provider\":\"salesforce\",\"line\":\"trigger\",\"path\":[\"parameters\",\"record_id\"]}') : 'default'"
+            },
+            "extended_input_schema": [
+              {
+                "name": "sobject_name",
+                "label": "Object name",
+                "type": "string"
+              },
+              {
+                "name": "query",
+                "label": "Query",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "number": 3,
+            "provider": "salesforce",
+            "name": "update_sobject_v2",
+            "keyword": "action",
+            "uuid": "update-salesforce",
+            "input": {
+              "sobject_name": "Account",
+              "id": "=_dp('{\"pill_type\":\"output\",\"provider\":\"salesforce\",\"line\":\"search-salesforce\",\"path\":[\"records\",0,\"Id\"]}')",
+              "name": "=_dp('{\"pill_type\":\"output\",\"provider\":\"salesforce\",\"line\":\"search-salesforce\",\"path\":[\"records\",0,\"Name\"]}').upcase"
+            },
+            "extended_input_schema": [
+              {
+                "name": "sobject_name",
+                "label": "Object name",
+                "type": "string"
+              },
+              {
+                "name": "id",
+                "label": "ID",
+                "type": "string"
+              },
+              {
+                "name": "name",
+                "label": "Name",
+                "type": "string"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "number": 4,
+        "keyword": "catch",
+        "uuid": "catch-block",
+        "as": "error_handler",
+        "input": {
+          "max_retry_count": 3
+        },
+        "block": [
+          {
+            "number": 5,
+            "provider": "logger",
+            "name": "log_message",
+            "keyword": "action",
+            "uuid": "log-error",
+            "input": {
+              "message": "=_dp('{\"pill_type\":\"output\",\"provider\":null,\"line\":\"error_handler\",\"path\":[\"message\"]}')"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "config": [
+    {
+      "keyword": "application",
+      "provider": "workato_recipe_function",
+      "name": "recipe_function"
+    },
+    {
+      "keyword": "application",
+      "provider": "salesforce",
+      "name": "salesforce"
+    }
+  ]
+}

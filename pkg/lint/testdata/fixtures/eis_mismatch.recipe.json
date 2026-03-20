@@ -1,0 +1,98 @@
+{
+  "name": "EIS mismatch test",
+  "version": 1,
+  "private": true,
+  "concurrency": 1,
+  "code": {
+    "number": 0,
+    "provider": "workato_recipe_function",
+    "name": "execute",
+    "as": "trigger",
+    "keyword": "trigger",
+    "uuid": "eis-trigger",
+    "input": {
+      "parameters_schema_json": "[{\"name\":\"input_id\",\"label\":\"Input ID\",\"type\":\"string\"}]"
+    },
+    "block": [
+      {
+        "number": 1,
+        "provider": "salesforce",
+        "name": "create_sobject_v2",
+        "keyword": "action",
+        "uuid": "create-with-mismatch",
+        "input": {
+          "sobject_name": "Contact",
+          "first_name": "John",
+          "last_name": "Doe",
+          "email": "john@example.com",
+          "extra_field_not_in_eis": "surprise"
+        },
+        "extended_input_schema": [
+          {
+            "name": "sobject_name",
+            "label": "Object name",
+            "type": "string"
+          },
+          {
+            "name": "first_name",
+            "label": "First Name",
+            "type": "string"
+          },
+          {
+            "name": "last_name",
+            "label": "Last Name",
+            "type": "string"
+          },
+          {
+            "name": "email",
+            "label": "Email",
+            "type": "string"
+          },
+          {
+            "name": "eis_only_field",
+            "label": "EIS Only",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "provider": "salesforce",
+        "name": "update_sobject_v2",
+        "keyword": "action",
+        "uuid": "update-with-nested",
+        "input": {
+          "sobject_name": "Account",
+          "address": {
+            "street": "123 Main St",
+            "city": "NYC"
+          }
+        },
+        "extended_input_schema": [
+          {
+            "name": "sobject_name",
+            "label": "Object name",
+            "type": "string"
+          },
+          {
+            "name": "address",
+            "label": "Address",
+            "type": "object"
+          }
+        ]
+      }
+    ]
+  },
+  "config": [
+    {
+      "keyword": "application",
+      "provider": "workato_recipe_function",
+      "name": "recipe_function"
+    },
+    {
+      "keyword": "application",
+      "provider": "salesforce",
+      "name": "salesforce"
+    }
+  ]
+}

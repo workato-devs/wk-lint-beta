@@ -35,6 +35,8 @@ func lintTier1Steps(parsed *recipe.ParsedRecipe, filename string, connRules map[
 	diags = append(diags, checkNoElsif(parsed)...)
 	diags = append(diags, checkResponseCodesDefined(parsed)...)
 	diags = append(diags, checkFormulaMethods(parsed)...)
+	diags = append(diags, checkDatapillsWithCatchAliases(parsed, connRules)...)
+	diags = append(diags, checkEIS(parsed, connRules)...)
 
 	return diags
 }
