@@ -62,11 +62,17 @@ type lintRunResult struct {
 
 // --- lint.pre_push types ---
 
+type hookFile struct {
+	Path       string `json:"path"`
+	Status     string `json:"status"`
+	ServerPath string `json:"server_path,omitempty"`
+}
+
 type prePushParams struct {
-	ProjectRoot string   `json:"project_root"`
-	Files       []string `json:"files"`
-	Profile     string   `json:"profile"`
-	PluginDir   string   `json:"plugin_dir"`
+	ProjectRoot string     `json:"project_root"`
+	Files       []hookFile `json:"files"`
+	Profile     string     `json:"profile"`
+	PluginDir   string     `json:"plugin_dir"`
 }
 
 type prePushDiagnostic struct {
@@ -250,8 +256,8 @@ func handlePrePush(req RPCRequest) RPCResponse {
 	// Filter to .recipe.json files only
 	var recipeFiles []string
 	for _, f := range params.Files {
-		if strings.HasSuffix(f, ".recipe.json") {
-			recipeFiles = append(recipeFiles, f)
+		if strings.HasSuffix(f.Path, ".recipe.json") {
+			recipeFiles = append(recipeFiles, f.Path)
 		}
 	}
 

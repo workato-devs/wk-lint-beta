@@ -139,7 +139,7 @@ func TestPrePushWithFiles(t *testing.T) {
 
 	params, _ := json.Marshal(prePushParams{
 		ProjectRoot: "",
-		Files:       []string{fixturePath, "/some/path/not_a_recipe.json"},
+		Files:       []hookFile{{Path: fixturePath}, {Path: "/some/path/not_a_recipe.json"}},
 	})
 
 	req := RPCRequest{
@@ -188,7 +188,7 @@ func TestPrePushWithFiles(t *testing.T) {
 func TestPrePushFiltersNonRecipeFiles(t *testing.T) {
 	params, _ := json.Marshal(prePushParams{
 		ProjectRoot: "/fake/root",
-		Files:       []string{"readme.md", "package.json", "styles.css"},
+		Files:       []hookFile{{Path: "readme.md"}, {Path: "package.json"}, {Path: "styles.css"}},
 	})
 
 	req := RPCRequest{
