@@ -7,5 +7,8 @@
 *.out
 .DS_Store
 
-#Development artifacts
+# Environment
+.env
+
+# Development artifacts
 *TODO.md

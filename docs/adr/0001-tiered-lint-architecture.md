@@ -1,8 +1,8 @@
 # Recipe Linter: Tiered Validation for Workato Recipe JSON
 
 **Author:** Zayne Turner
-**Status:** Accepted — Partially Implemented (Tiers 0 + 1a)
-**Date:** February 23, 2026 (original) · March 2, 2026 (amendments incorporated)
+**Status:** Accepted — Fully Implemented (Tiers 0-3)
+**Date:** February 23, 2026 (original) · March 2, 2026 (amendments incorporated) · March 20, 2026 (IGM port + Tiers 2-3 implemented)
 
 ---
 
@@ -14,7 +14,7 @@ A tiered validation pipeline for Workato recipe JSON, shipped as a `wk` CLI plug
 
 The v5 IGM experiment revealed that agents using recipe-skills produce structurally sound recipes (Q1-Q8 pass rates near 100%), but **cannot reliably validate their own output against the skills' validation checklists.** The failure mode is false negatives — the agent says "looks good" when it isn't. This isn't a skills content problem; the checklists are thorough. It's a representation problem: agents can't hold 30+ checklist items in working memory while scanning 50-90KB of deeply nested JSON.
 
-The existing IGM transformer (`recipe-visualizer/claude/core/transformer.ts`) already catches some structural issues — missing `code` field, unknown keywords, multiple catch blocks. But its diagnostic coverage is incidental to its primary job (graph construction), and it's TypeScript locked inside a VS Code extension. A Go-native linter compiled into a CLI plugin puts validation where it needs to be: in CI pipelines, in `wk push` pre-flight, and in agent validation loops — all without requiring Node.js.
+The existing IGM transformer (`the TypeScript IGM transformer source`) already catches some structural issues — missing `code` field, unknown keywords, multiple catch blocks. But its diagnostic coverage is incidental to its primary job (graph construction), and it's TypeScript locked inside a VS Code extension. A Go-native linter compiled into a CLI plugin puts validation where it needs to be: in CI pipelines, in `wk push` pre-flight, and in agent validation loops — all without requiring Node.js.
 
 ---
 
@@ -30,7 +30,7 @@ The `wk` CLI's entire value proposition is "single binary, no runtime dependenci
 
 Tiers 0-1 (schema validation, step-level rules, datapill syntax, EIS checking) have zero IGM dependency. These are pure JSON tree walking and pattern matching — the highest-value rules and the ones that catch the false negatives we care about most. They ship first.
 
-Tiers 2-3 (structural assertions, data flow resolution) consume the IGM graph. When these tiers are needed, the IGM transformer gets ported to Go as `pkg/igm/` in the CLI monorepo. The transformer is ~800 lines of recursive tree walking — straightforward to port. The TypeScript version stays in `recipe-visualizer` for the VS Code extension. The IGM v1.2 spec is the shared contract; both implementations produce conformant graphs, validated by snapshot tests against the same fixtures.
+Tiers 2-3 (structural assertions, data flow resolution) consume the IGM graph. When these tiers are needed, the IGM transformer gets ported to Go as `pkg/igm/` in the CLI monorepo. The transformer is ~800 lines of recursive tree walking — straightforward to port. The TypeScript version stays in the VS Code extension repo for the VS Code extension. The IGM v1.2 spec is the shared contract; both implementations produce conformant graphs, validated by snapshot tests against the same fixtures.
 
 ---
 
@@ -148,7 +148,7 @@ This is the tier where the **false negatives live**. Datapill syntax rules, `lhs
 
 A dedicated sub-linter that walks every string value in the recipe, extracts `_dp()` calls, and validates them in context.
 
-**Datapill regex validation requirement:** Before the extraction pattern `_dp\('(\{[^']+\})'\)` is committed, it must be validated against two recipe corpora (dewy-resort + a second repository). Any delta between the proposed regex and a broad `_dp(...)` pattern means the regex is missing datapills and must be revised.
+**Datapill regex validation requirement:** Before the extraction pattern `_dp\('(\{[^']+\})'\)` is committed, it must be validated against two recipe corpora (a primary corpus + a second repository). Any delta between the proposed regex and a broad `_dp(...)` pattern means the regex is missing datapills and must be revised.
 
 | Rule ID | Check | Source |
 |---------|-------|--------|
@@ -603,16 +603,41 @@ wk-cli-beta/
 | Plugin binary | `wk-cli-beta/plugins/recipe-lint/` | Go | JSON-RPC server, imports `pkg/lint` |
 | Plugin manifest | `plugins/recipe-lint/plugin.toml` | TOML | Declares commands + hooks |
 | IGM transformer (Go port) | `wk-cli-beta/pkg/igm/` | Go | Linter Tiers 2-3 + future `wk igm` command |
-| IGM transformer (original) | `recipe-visualizer/core/` | TypeScript | VS Code extension visualization |
+| IGM transformer (original) | VS Code extension repo `core/` | TypeScript | VS Code extension visualization |
 | Connector-specific rule data | `recipe-skills/skills/*/` | JSON | Loaded by Go linter at runtime |
 | Prose validation checklists | `recipe-skills/skills/*/` | Markdown | Human documentation (not executed) |
 | Installed plugin (user) | `~/.wk/plugins/recipe-lint/` | Binary | Installed via `wk plugins install` |
 
 ### Two IGM Implementations, One Spec
 
-The IGM v1.2 spec (`igm-schema-and-mapping-rules-v1.2-merged.md`) is the shared contract. Both the TypeScript and Go implementations must produce conformant graphs for the same input recipes. Conformance is validated by running both implementations against the same fixture set (`dewy-resort/workato/recipes/orchestrator-recipes/`) and comparing output snapshots.
+The IGM v1.2 spec (`igm-schema-and-mapping-rules-v1.2-merged.md`) is the shared contract. Both the TypeScript and Go implementations must produce conformant graphs for the same input recipes. Conformance is validated by running both implementations against the same fixture set (the recipe corpus) and comparing output snapshots.
 
 The TypeScript implementation continues to serve the VS Code extension. The Go implementation serves the CLI linter and any future `wk igm <recipe>` command. They are siblings, not a fork — changes to the spec are implemented in both.
+
+#### Conformance testing: build-tag-gated snapshot comparison (March 2026)
+
+Cross-implementation conformance is verified by a snapshot comparison test that runs both the Go and TypeScript transformers against the same fixtures and diffs the normalized output (node IDs, kinds, pointers, providers, terminal flags, HTTP statuses, alias maps, roots, and edges).
+
+**Why a build tag, not always-on tests:** The snapshot comparison shells out to `npx tsx` to run the TypeScript transformer — it requires Node.js, the TS IGM project checked out locally, and `node_modules` installed. This violates the linter's core principle of zero runtime dependencies and minimal test infrastructure. The comparison is a development-time verification tool for release gates, not a CI invariant.
+
+**How it works:**
+
+- `pkg/igm/snapshot.go` and `pkg/igm/snapshot_test.go` are gated behind `//go:build snapshot`. The types (`Snapshot`, `SnapshotNode`, `SnapshotEdge`) and methods (`ToSnapshot()`, `SnapshotJSON()`) are absent from the compiled package in normal builds.
+- The TS project must provide a `core/snapshot-export.ts` script that runs `buildIgm()` and outputs a normalized JSON format.
+- Default `go test ./...` skips both files entirely — they don't exist to the compiler.
+- The test is configured via environment variables, not hardcoded paths:
+  - `IGM_TS_PROJECT_DIR` — path to the TypeScript IGM project root
+  - `RECIPE_CORPUS_DIR` — path to a recipe corpus for cross-repo fixtures
+- Example invocation:
+  ```bash
+  IGM_TS_PROJECT_DIR=../my-visualizer/src RECIPE_CORPUS_DIR=../my-recipes/workato/recipes \
+    go test -tags snapshot ./pkg/igm/ -run Snapshot
+  ```
+- The test gracefully skips when env vars are unset or paths don't exist.
+
+**What gets compared:** Every field that the linter consumes from the IGM graph. UI-only fields (badges, partitions, schema fields) are excluded — the Go port intentionally omits visualization concerns.
+
+**When to run it:** Before any release that modifies `pkg/igm/transformer.go` or the TypeScript transformer. Not in CI, not in pre-commit hooks, not in `go test ./...`.
 
 ---
 
@@ -789,18 +814,18 @@ Tiers 0 and 1 run independently of the IGM — no transformer dependency, fast, 
 
 ## Test Fixture Requirements
 
-Phase 1 requires four recipe JSON fixtures before implementation begins. Three are selected from `dewy-resort/workato/recipes/orchestrator-recipes/`; one is hand-crafted.
+Phase 1 requires four recipe JSON fixtures before implementation begins. Three are selected from the recipe corpus; one is hand-crafted.
 
 ### Required fixtures
 
 | Fixture | Source | Rules Exercised | File |
 |---|---|---|---|
-| API endpoint recipe with try/catch | dewy-resort | `RESPONSE_CODES_DEFINED`, `PICK_LIST_MATCH`, `CATCH_*`, `ALL_PATHS_RETURN`, `TERMINAL_COVERAGE`, `SUCCESS_BEFORE_CATCH`, `return_response` EIS rules | `pkg/lint/testdata/fixtures/api_endpoint_try_catch.recipe.json` |
-| Simple connector recipe (linear) | dewy-resort | `STEP_NUMBERING`, `UUID_*`, `CONFIG_*`, `EIS_MIRRORS_INPUT`, connector-specific rules | `pkg/lint/testdata/fixtures/simple_connector.recipe.json` |
-| Recipe with if/else branching | dewy-resort | `IF_NO_PROVIDER`, `ELSE_NO_PROVIDER`, `ELSE_LAST_IN_IF`, `NO_ELSIF`, `DP_LHS_NO_FORMULA` | `pkg/lint/testdata/fixtures/if_else_branching.recipe.json` |
+| API endpoint recipe with try/catch | the recipe corpus | `RESPONSE_CODES_DEFINED`, `PICK_LIST_MATCH`, `CATCH_*`, `ALL_PATHS_RETURN`, `TERMINAL_COVERAGE`, `SUCCESS_BEFORE_CATCH`, `return_response` EIS rules | `pkg/lint/testdata/fixtures/api_endpoint_try_catch.recipe.json` |
+| Simple connector recipe (linear) | the recipe corpus | `STEP_NUMBERING`, `UUID_*`, `CONFIG_*`, `EIS_MIRRORS_INPUT`, connector-specific rules | `pkg/lint/testdata/fixtures/simple_connector.recipe.json` |
+| Recipe with if/else branching | the recipe corpus | `IF_NO_PROVIDER`, `ELSE_NO_PROVIDER`, `ELSE_LAST_IN_IF`, `NO_ELSIF`, `DP_LHS_NO_FORMULA` | `pkg/lint/testdata/fixtures/if_else_branching.recipe.json` |
 | Deliberately malformed recipe | Hand-crafted | All Tier 0 rules (negative cases): missing `code`, `code` as array, missing `uuid`, bad `config` shape | `pkg/lint/testdata/malformed/tier0_failures.recipe.json` |
 
-### Selection criteria for dewy-resort fixtures
+### Selection criteria for the recipe corpus fixtures
 
 - Choose recipes that are known-good (they've been deployed and tested in workshops)
 - Each fixture should be annotated with a comment header documenting which fields the linter inspects (not in the JSON itself — in a companion `.md` or in the test file)
@@ -809,7 +834,7 @@ Phase 1 requires four recipe JSON fixtures before implementation begins. Three a
 ### Additional fixtures (Phase 2+)
 
 - Phase 2 adds a datapill-heavy fixture with formula mode, interpolation mode, and condition `lhs` fields
-- Phase 3 adds fixtures from a second repo (not dewy-resort) to validate regex and rule coverage against a different recipe authoring style
+- Phase 3 adds fixtures from a second repo (not the recipe corpus) to validate regex and rule coverage against a different recipe authoring style
 
 ---
 
@@ -833,7 +858,7 @@ JSON structure validation, plus step-level rules (numbering, UUID, config, if/el
 | `internal/plugin/hooks.go` | Pre-push hook dispatch (~40-60 lines) |
 | `internal/plugin/manifest.go` | Modified: `Hooks` field on `Manifest` struct |
 | `internal/commands/sync.go` | Modified: pre-push hook invocation + `--skip-lint` flag |
-| Test fixtures | 4 fixtures: 3 dewy-resort + 1 hand-crafted negative |
+| Test fixtures | 4 fixtures: 3 from recipe corpus + 1 hand-crafted negative |
 | Tier 0 + Tier 1a rules | All rules in these tiers implemented and tested |
 
 **What pulls forward from ROADMAP.md:**
@@ -852,28 +877,31 @@ The dedicated datapill walker with context-aware validation. The `DP_LHS_NO_FORM
 - `pkg/recipe/walk.go` for generic JSON tree walking with path tracking
 - Datapill regex validation report against two corpora
 
-### Phase 3: Tier 1c + Tier 2 — EIS + IGM Structural Rules
+### Phase 3: Tier 1c + Tier 2 — EIS + IGM Structural Rules ✓
 
-**When:** CLI Phase 3-4 (weeks 11-18). Requires IGM port.
+**Status:** Implemented March 2026.
 
-EIS mirror checking (tree comparison, connector-internal awareness) plus IGM-based structural assertions. Ships alongside or just after the Go IGM transformer port.
+EIS mirror checking (tree comparison, connector-internal awareness) plus IGM-based structural assertions.
 
-**Deliverables:**
+**Deliverables (all shipped):**
 - `pkg/lint/tier1_eis.go` with EIS mirror checking
-- `pkg/lint/tier2_structure.go` consuming `*igm.Graph`
-- `pkg/igm/` — Go port of IGM transformer (shared with future `wk igm` command)
+- `pkg/lint/tier2_structure.go` — 7 rules consuming `*igm.Graph` (CATCH_LAST_IN_TRY, ELSE_LAST_IN_IF, SUCCESS_BEFORE_CATCH, TERMINAL_COVERAGE, ALL_PATHS_RETURN, CATCH_RETURNS_ALL_FIELDS, RECIPE_CALL_ZIP_NAME)
+- `pkg/igm/` — Go port of IGM transformer: `types.go` (graph/node/edge types + query methods), `transformer.go` (recursive tree walker, ~350 LoC)
 - Connector-specific `lint-rules.json` loading from `--skills-path`
-- Conformance test suite: Go IGM vs TypeScript IGM on shared fixtures
+- Conformance test suite: Go IGM vs TypeScript IGM on shared fixtures (build-tag-gated, see "Two IGM Implementations" section)
+- Corpus validation against 80 files from the recipe corpus (49 recipes pass, non-recipe files correctly skipped)
 
-### Phase 4: Tier 3 — Data Flow Validation
+### Phase 4: Tier 3 — Data Flow Validation ✓
 
-**When:** CLI Phase 4+ (weeks 15+). Requires IGM alias map.
+**Status:** Implemented March 2026 (shipped alongside Phase 3).
 
-Datapill reference resolution using the IGM alias map. The alias map already exists in the TypeScript transformer; the Go port carries it forward.
+Datapill reference resolution using the IGM alias map and graph reachability analysis.
 
-**Deliverables:**
-- `pkg/lint/tier3_dataflow.go` consuming alias map from `pkg/igm/`
-- `DP_STEP_REACHABLE` rule (graph reachability analysis)
+**Deliverables (all shipped):**
+- `pkg/lint/tier3_dataflow.go` — 4 rules consuming alias map + graph from `pkg/igm/` (DP_LINE_RESOLVES, DP_PROVIDER_MATCHES, DP_STEP_REACHABLE, DP_TRIGGER_PATH)
+- `DP_STEP_REACHABLE` uses BFS-based reverse reachability over the IGM edge set
+- Profiles updated: `standard.json` (11 new rules), `strict.json` (7 rules escalated to error)
+- `pkg/lint/lint.go` orchestrator updated: default tier set now 0-3, IGM graph built lazily before Tier 2, non-fatal on IGM build failure
 
 ---
 
