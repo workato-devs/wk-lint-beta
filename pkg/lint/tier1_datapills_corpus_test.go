@@ -9,11 +9,15 @@ import (
 )
 
 // TestDatapillRegexCorpusValidation validates the _dp() extraction regex against
-// the dewy-resort recipe corpus to ensure no datapill occurrences are missed.
+// a recipe corpus to ensure no datapill occurrences are missed.
+// Set RECIPE_CORPUS_DIR to the recipe directory to enable this test.
 func TestDatapillRegexCorpusValidation(t *testing.T) {
-	corpusDir := filepath.Join(os.Getenv("HOME"), "Github", "dewy-resort", "workato", "recipes")
-	if _, err := os.Stat(corpusDir); os.IsNotExist(err) {
-		t.Skip("corpus directory not found at ~/Github/dewy-resort/workato/recipes — skipping")
+	dir := os.Getenv("RECIPE_CORPUS_DIR")
+	if dir == "" {
+		t.Skip("RECIPE_CORPUS_DIR not set — skipping corpus test")
+	}
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Skipf("RECIPE_CORPUS_DIR %q not found", dir)
 	}
 
 	// Broad pattern: any _dp(...) including nested parens
@@ -23,7 +27,7 @@ func TestDatapillRegexCorpusValidation(t *testing.T) {
 	var totalPrecise int
 	var deltas []string
 
-	err := filepath.Walk(corpusDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -50,7 +54,7 @@ func TestDatapillRegexCorpusValidation(t *testing.T) {
 		}
 		for _, m := range broadMatches {
 			if !preciseSet[m] {
-				relPath, _ := filepath.Rel(corpusDir, path)
+				relPath, _ := filepath.Rel(dir, path)
 				deltas = append(deltas, relPath+": "+m)
 			}
 		}

@@ -100,8 +100,8 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 	if len(datapills) == 0 {
 		if ctx.IsCondLHS && strings.HasPrefix(value, "=") {
 			diags = append(diags, LintDiagnostic{
-				Level:   LevelError,
-				Message: "Condition LHS should not be a formula expression",
+				Level:   LevelWarn,
+				Message: "Condition input should be a datapill, not a formula expression",
 				Source:  &SourceRef{JSONPointer: ctx.Pointer},
 				RuleID:  "DP_LHS_NO_FORMULA",
 				Tier:    1,
@@ -126,8 +126,8 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 	// DP_LHS_NO_FORMULA
 	if ctx.IsCondLHS && strings.HasPrefix(value, "=") {
 		diags = append(diags, LintDiagnostic{
-			Level:   LevelError,
-			Message: "Condition LHS should not be a formula expression",
+			Level:   LevelWarn,
+			Message: "Condition input should be a datapill, not a formula expression",
 			Source:  &SourceRef{JSONPointer: ctx.Pointer},
 			RuleID:  "DP_LHS_NO_FORMULA",
 			Tier:    1,
