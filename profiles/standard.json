@@ -9,7 +9,7 @@
     "FORMULA_METHOD_INVALID": "warning",
     "FORMULA_FORBIDDEN_PATTERN": "warning",
     "DP_VALID_JSON": "error",
-    "DP_LHS_NO_FORMULA": "error",
+    "DP_LHS_NO_FORMULA": "warning",
     "DP_INTERPOLATION_SINGLE": "warning",
     "DP_FORMULA_CONCAT": "warning",
     "DP_NO_OUTER_PARENS": "info",
@@ -19,6 +19,17 @@
     "EIS_NESTED_MATCH": "warning",
     "EIS_NAME_MATCH": "warning",
     "EIS_NO_CONNECTOR_INTERNAL": "warning",
-    "EIS_OUTPUT_MIRRORS_INPUT": "info"
+    "EIS_OUTPUT_MIRRORS_INPUT": "info",
+    "CATCH_LAST_IN_TRY": "error",
+    "ELSE_LAST_IN_IF": "error",
+    "SUCCESS_BEFORE_CATCH": "warning",
+    "TERMINAL_COVERAGE": "warning",
+    "ALL_PATHS_RETURN": "warning",
+    "CATCH_RETURNS_ALL_FIELDS": "warning",
+    "RECIPE_CALL_ZIP_NAME": "warning",
+    "DP_LINE_RESOLVES": "warning",
+    "DP_PROVIDER_MATCHES": "warning",
+    "DP_STEP_REACHABLE": "warning",
+    "DP_TRIGGER_PATH": "info"
   }
 }

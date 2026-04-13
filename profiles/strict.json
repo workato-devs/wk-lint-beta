@@ -9,6 +9,13 @@
     "DP_VALID_JSON": "error",
     "DP_LHS_NO_FORMULA": "error",
     "EIS_MIRRORS_INPUT": "error",
-    "EIS_NAME_MATCH": "error"
+    "EIS_NAME_MATCH": "error",
+    "ALL_PATHS_RETURN": "error",
+    "TERMINAL_COVERAGE": "error",
+    "CATCH_RETURNS_ALL_FIELDS": "error",
+    "RECIPE_CALL_ZIP_NAME": "error",
+    "DP_LINE_RESOLVES": "error",
+    "DP_PROVIDER_MATCHES": "error",
+    "DP_STEP_REACHABLE": "error"
   }
 }
