@@ -3,6 +3,7 @@ package lint
 import (
 	"path/filepath"
 
+	"github.com/workato-devs/wk-lint-beta/pkg/igm"
 	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
 )
 
@@ -56,6 +57,8 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 	if len(opts.Tiers) == 0 {
 		tierSet[0] = true
 		tierSet[1] = true
+		tierSet[2] = true
+		tierSet[3] = true
 	} else {
 		for _, t := range opts.Tiers {
 			tierSet[t] = true
@@ -101,10 +104,38 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		diags = append(diags, tier1Diags...)
 	}
 
-	// 9. Apply overrides (profile first, then config)
+	// 9. Build IGM graph for Tier 2-3 if needed
+	var graph *igm.Graph
+	if tierSet[2] || tierSet[3] {
+		var igmErr error
+		graph, igmErr = igm.Transform(data)
+		if igmErr != nil {
+			// IGM build failure is non-fatal; skip Tier 2-3
+			diags = append(diags, LintDiagnostic{
+				Level:   LevelWarn,
+				Message: "IGM graph build failed; skipping Tier 2-3 rules: " + igmErr.Error(),
+				RuleID:  "IGM_BUILD_FAILED",
+				Tier:    2,
+			})
+		}
+	}
+
+	// 10. Run Tier 2 if requested
+	if tierSet[2] && graph != nil {
+		tier2Diags := lintTier2Structure(graph, parsed)
+		diags = append(diags, tier2Diags...)
+	}
+
+	// 11. Run Tier 3 if requested
+	if tierSet[3] && graph != nil {
+		tier3Diags := lintTier3DataFlow(parsed, graph)
+		diags = append(diags, tier3Diags...)
+	}
+
+	// 12. Apply overrides (profile first, then config)
 	diags = applyOverrides(diags, resolvedProfile, cfg)
 
-	// 10. Filter out "off" rules
+	// 13. Filter out "off" rules
 	diags = filterOff(diags)
 
 	return diags, nil
