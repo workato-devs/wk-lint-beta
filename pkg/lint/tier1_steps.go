@@ -31,6 +31,7 @@ func lintTier1Steps(parsed *recipe.ParsedRecipe, filename string, connRules map[
 	diags = append(diags, checkConfigNoWorkato(parsed)...)
 	diags = append(diags, checkConfigProviderMatch(parsed, connRules)...)
 	diags = append(diags, checkActionNameValid(parsed, connRules)...)
+	diags = append(diags, checkActionRules(parsed, connRules)...)
 	diags = append(diags, checkControlFlowRules(parsed)...)
 	diags = append(diags, checkNoElsif(parsed)...)
 	diags = append(diags, checkResponseCodesDefined(parsed)...)
@@ -422,4 +423,164 @@ func checkResponseCodesDefined(parsed *recipe.ParsedRecipe) []LintDiagnostic {
 		}
 	}
 	return diags
+}
+
+// checkActionRules evaluates legacy v0.1.0 ActionRules from connector rules.
+func checkActionRules(parsed *recipe.ParsedRecipe, connRules map[string]*ConnectorRules) []LintDiagnostic {
+	var diags []LintDiagnostic
+	if len(connRules) == 0 {
+		return diags
+	}
+	for _, step := range parsed.Steps {
+		if step.Code.Provider == nil || *step.Code.Provider == "" {
+			continue
+		}
+		if step.Code.Name == "" {
+			continue
+		}
+		provider := *step.Code.Provider
+		cr, ok := connRules[provider]
+		if !ok {
+			continue
+		}
+		for _, rule := range cr.ActionRules {
+			if !actionRuleApplies(step.Code.Name, rule.ActionNames) {
+				continue
+			}
+			diags = append(diags, evalRequireFields(step, rule)...)
+			diags = append(diags, evalActionEISMustBeEmpty(step, rule)...)
+			diags = append(diags, evalFieldTypeChecks(step, rule)...)
+		}
+	}
+	return diags
+}
+
+func actionRuleApplies(name string, actionNames []string) bool {
+	for _, an := range actionNames {
+		if an == name {
+			return true
+		}
+	}
+	return false
+}
+
+func evalRequireFields(step recipe.FlatStep, rule ActionRule) []LintDiagnostic {
+	if len(rule.RequireFields) == 0 {
+		return nil
+	}
+	locations := rule.RequireIn
+	if len(locations) == 0 {
+		locations = []string{"input"}
+	}
+	var diags []LintDiagnostic
+	for _, field := range rule.RequireFields {
+		for _, loc := range locations {
+			raw := resolveStepLocation(step, loc)
+			if len(raw) == 0 {
+				msg := expandMessage(rule.Message, map[string]string{
+					"missing_location": loc,
+					"field_name":       field,
+				})
+				diags = append(diags, LintDiagnostic{
+					Level:   LevelWarn,
+					Message: msg,
+					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/" + loc},
+					RuleID:  rule.RuleID,
+					Tier:    1,
+				})
+				continue
+			}
+			var m map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &m); err != nil {
+				continue
+			}
+			if _, ok := m[field]; !ok {
+				msg := expandMessage(rule.Message, map[string]string{
+					"missing_location": loc,
+					"field_name":       field,
+				})
+				diags = append(diags, LintDiagnostic{
+					Level:   LevelWarn,
+					Message: msg,
+					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/" + loc},
+					RuleID:  rule.RuleID,
+					Tier:    1,
+				})
+			}
+		}
+	}
+	return diags
+}
+
+func evalActionEISMustBeEmpty(step recipe.FlatStep, rule ActionRule) []LintDiagnostic {
+	if !rule.EISMustBeEmpty {
+		return nil
+	}
+	raw := step.Code.ExtendedInputSchema
+	if len(raw) == 0 {
+		return nil
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "null" || trimmed == "[]" {
+		return nil
+	}
+	return []LintDiagnostic{{
+		Level:   LevelWarn,
+		Message: rule.Message,
+		Source:  &SourceRef{JSONPointer: step.JSONPointer + "/extended_input_schema"},
+		RuleID:  rule.RuleID,
+		Tier:    1,
+	}}
+}
+
+func evalFieldTypeChecks(step recipe.FlatStep, rule ActionRule) []LintDiagnostic {
+	if len(rule.FieldTypeChecks) == 0 {
+		return nil
+	}
+	eisFields, err := parseEIS(step.Code.ExtendedInputSchema)
+	if err != nil {
+		return nil
+	}
+	eisByName := make(map[string]EISField)
+	for _, f := range eisFields {
+		eisByName[f.Name] = f
+	}
+	var diags []LintDiagnostic
+	for fieldName, check := range rule.FieldTypeChecks {
+		ef, ok := eisByName[fieldName]
+		if !ok {
+			continue
+		}
+		mismatch := false
+		if check.Type != "" && ef.Type != check.Type {
+			mismatch = true
+		}
+		if check.ParseOutput != "" && ef.ParseOutput != check.ParseOutput {
+			mismatch = true
+		}
+		if mismatch {
+			msg := expandMessage(rule.Message, map[string]string{
+				"field_name": fieldName,
+			})
+			diags = append(diags, LintDiagnostic{
+				Level:   LevelWarn,
+				Message: msg,
+				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/extended_input_schema"},
+				RuleID:  rule.RuleID,
+				Tier:    1,
+			})
+		}
+	}
+	return diags
+}
+
+func resolveStepLocation(step recipe.FlatStep, location string) json.RawMessage {
+	switch location {
+	case "input":
+		return step.Code.Input
+	case "dynamicPickListSelection":
+		return step.Code.DynamicPickListSelection
+	default:
+		return nil
+	}
 }

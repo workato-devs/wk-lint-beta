@@ -98,10 +98,30 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		return diags, err
 	}
 
+	// 7b. Load custom rules from skills + project .wklint/rules/
+	projectRoot := ""
+	if opts.ConfigPath != "" {
+		projectRoot = filepath.Dir(opts.ConfigPath)
+	}
+	customRules, loadWarnings, err := LoadCustomRules(opts.SkillsPath, projectRoot)
+	if err != nil {
+		return diags, err
+	}
+	diags = append(diags, loadWarnings...)
+	// Also collect custom rules embedded in connector rule files (v0.2.0)
+	for _, cr := range connRules {
+		customRules = append(customRules, cr.Rules...)
+	}
+
+	// 7c. Run Tier 0 custom rules (requires parsed recipe, so runs after parsing)
+	if tierSet[0] {
+		diags = append(diags, evalCustomRules(parsed, customRules, 0, nil)...)
+	}
+
 	// 8. Run Tier 1 if requested
 	if tierSet[1] {
-		tier1Diags := lintTier1Steps(parsed, opts.Filename, connRules)
-		diags = append(diags, tier1Diags...)
+		diags = append(diags, lintTier1Steps(parsed, opts.Filename, connRules)...)
+		diags = append(diags, evalCustomRules(parsed, customRules, 1, nil)...)
 	}
 
 	// 9. Build IGM graph for Tier 2-3 if needed
@@ -110,7 +130,6 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		var igmErr error
 		graph, igmErr = igm.Transform(data)
 		if igmErr != nil {
-			// IGM build failure is non-fatal; skip Tier 2-3
 			diags = append(diags, LintDiagnostic{
 				Level:   LevelWarn,
 				Message: "IGM graph build failed; skipping Tier 2-3 rules: " + igmErr.Error(),
@@ -122,14 +141,14 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 
 	// 10. Run Tier 2 if requested
 	if tierSet[2] && graph != nil {
-		tier2Diags := lintTier2Structure(graph, parsed)
-		diags = append(diags, tier2Diags...)
+		diags = append(diags, lintTier2Structure(graph, parsed)...)
+		diags = append(diags, evalCustomRules(parsed, customRules, 2, graph)...)
 	}
 
 	// 11. Run Tier 3 if requested
 	if tierSet[3] && graph != nil {
-		tier3Diags := lintTier3DataFlow(parsed, graph)
-		diags = append(diags, tier3Diags...)
+		diags = append(diags, lintTier3DataFlow(parsed, graph)...)
+		diags = append(diags, evalCustomRules(parsed, customRules, 3, graph)...)
 	}
 
 	// 12. Apply overrides (profile first, then config)

@@ -12,7 +12,8 @@ type ConnectorRules struct {
 	Connector          string       `json:"connector"`
 	ConnectorInternals []string     `json:"connector_internals"`
 	ValidActionNames   []string     `json:"valid_action_names,omitempty"`
-	ActionRules        []ActionRule `json:"action_rules"`
+	ActionRules        []ActionRule   `json:"action_rules"`
+	Rules              []CustomRule   `json:"rules,omitempty"`
 }
 
 // ActionRule defines a single connector-specific lint rule.
@@ -28,8 +29,8 @@ type ActionRule struct {
 
 // FieldCheck defines a type check for a specific field.
 type FieldCheck struct {
-	Type     string `json:"type"`
-	Expected string `json:"expected"`
+	Type        string `json:"type"`
+	ParseOutput string `json:"parse_output"`
 }
 
 // LoadConnectorRules scans skillsPath for lint-rules.json files and returns

@@ -15,6 +15,18 @@ func TestTier23_RecipeCorpus(t *testing.T) {
 		t.Skipf("RECIPE_CORPUS_DIR %q not found", dir)
 	}
 
+	opts := LintOptions{
+		SkillsPath: os.Getenv("LINT_SKILLS_PATH"),
+		ConfigPath: os.Getenv("LINT_CONFIG_PATH"),
+	}
+
+	if opts.SkillsPath != "" {
+		t.Logf("Skills path: %s", opts.SkillsPath)
+	}
+	if opts.ConfigPath != "" {
+		t.Logf("Config path: %s", opts.ConfigPath)
+	}
+
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -39,14 +51,15 @@ func TestTier23_RecipeCorpus(t *testing.T) {
 				t.Fatalf("read: %v", err)
 			}
 
-			// Run full linter with all tiers
-			diags, err := LintRecipe(data, LintOptions{})
+			fileOpts := opts
+			fileOpts.Filename = name
+
+			diags, err := LintRecipe(data, fileOpts)
 			if err != nil {
 				t.Skipf("lint error (may not be a recipe): %v", err)
 				return
 			}
 
-			// Count by tier and rule
 			tierCounts := make(map[int]int)
 			ruleCounts := make(map[string]int)
 			for _, d := range diags {
@@ -57,7 +70,6 @@ func TestTier23_RecipeCorpus(t *testing.T) {
 			t.Logf("  Diagnostics: tier0=%d tier1=%d tier2=%d tier3=%d total=%d",
 				tierCounts[0], tierCounts[1], tierCounts[2], tierCounts[3], len(diags))
 
-			// Log tier 2/3 diagnostics specifically
 			for _, d := range diags {
 				if d.Tier >= 2 {
 					ptr := ""

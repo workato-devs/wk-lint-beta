@@ -9,10 +9,11 @@ import (
 
 // EISField represents a field in the extended_input_schema or extended_output_schema.
 type EISField struct {
-	Name       string     `json:"name"`
-	Label      string     `json:"label,omitempty"`
-	Type       string     `json:"type,omitempty"`
-	Properties []EISField `json:"properties,omitempty"`
+	Name        string     `json:"name"`
+	Label       string     `json:"label,omitempty"`
+	Type        string     `json:"type,omitempty"`
+	ParseOutput string     `json:"parse_output,omitempty"`
+	Properties  []EISField `json:"properties,omitempty"`
 }
 
 // parseEIS unmarshals a raw JSON array into EIS fields.

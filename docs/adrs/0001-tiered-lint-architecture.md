@@ -721,6 +721,32 @@ func LoadConnectorRules(skillsPath string) (map[string]*ConnectorRules, error) {
 
 Adding a new connector's lint rules means adding a `lint-rules.json` file — no Go code changes, no recompilation, no new CLI release. The plugin bundles its own `rules/` directory and can also load from `--skills-path`.
 
+### v0.2.0 format: connector data + custom rules (Amendment, April 2026)
+
+The v0.2.0 schema extends `lint-rules.json` with a `rules` array for general-purpose declarative rules. Connector-specific files can combine v0.1.0 fields (connector_internals, valid_action_names, action_rules) with v0.2.0 custom rules:
+
+```json
+{
+  "version": "0.2.0",
+  "connector": "salesforce",
+  "connector_internals": ["sobject_name"],
+  "valid_action_names": ["search_sobjects", "upsert_sobject"],
+  "rules": [
+    {
+      "rule_id": "SF_UUID_PREFIX",
+      "tier": 1,
+      "level": "warn",
+      "message": "Salesforce step UUID must start with 'sf-'",
+      "scope": "step",
+      "where": { "provider": "salesforce" },
+      "assert": { "field_matches": { "path": "uuid", "pattern": "^sf-" } }
+    }
+  ]
+}
+```
+
+Project teams can also author rules in `.wklint/rules/*.json` using the same schema (without the connector-specific fields). See the "Rule Evolution" section for the full matcher reference.
+
 ### `valid_action_names` — Provider Action Validation (Amendment, March 2026)
 
 The `valid_action_names` field on `ConnectorRules` lists the allowed action names for a provider. When present and non-empty, the `ACTION_NAME_VALID` rule checks that every step using that provider has a `name` matching one of the allowed values. If absent or empty, the rule is skipped for that provider.
@@ -741,57 +767,84 @@ Example for the `rest` connector:
 
 ---
 
-## Rule Evolution: No DSL — Go is the Rule Language
+## Rule Evolution: Declarative Matchers + Go Primitives
 
-The linter will never have a rule DSL. The evolution path is A (compiled rules) → C (plugin rules in Go), deliberately skipping B (declarative JSON rules for core logic).
+> **Amendment (April 2026):** The original version of this section stated "No DSL — Go is the Rule Language" and rejected declarative JSON rules entirely. That position was incoherent with the design intent: the tier engine is the product's core value, but customers had no way to author rules that run through it. The `ActionRule` struct defined check types in JSON but never evaluated them. This amendment replaces the original section.
 
-### What stays in JSON
+### The extensibility model
 
-Connector-specific *data* stays in `lint-rules.json` files. These are not rules — they are data that parameterize existing Go rules. "Salesforce's `sobject_name` is a connector-internal field" is data. "Check that every `input` field has a matching EIS entry" is a rule. The distinction:
+Lint rules are data. Customers — both connector skill authors and end-user project teams — author rules as JSON files that the tier engine evaluates. The JSON schema provides a constrained set of composable matchers (not a general-purpose DSL). Adding new matcher primitives requires Go code; composing existing matchers into rules is pure JSON.
 
 | Artifact | Language | Changes when... | Example |
 |---|---|---|---|
-| Rule logic | Go (in `pkg/lint/`) | Recipe format changes, new validation patterns discovered | `EIS_MIRRORS_INPUT` check |
-| Connector data | JSON (`lint-rules.json`) | New connector supported, connector API changes | Salesforce `connector_internals` list |
+| Matcher primitives | Go (in `pkg/lint/eval.go`) | New validation patterns needed that existing matchers can't express | `field_matches` evaluator, `step_count` evaluator |
+| Rule definitions | JSON (`lint-rules.json`, `.wklint/rules/*.json`) | New connector, new architectural constraint, new naming convention | "UUIDs must start with connector prefix" |
+| Connector data | JSON (`lint-rules.json`) | Connector API changes | Salesforce `connector_internals` list |
 | Rule configuration | JSON (`.wklintrc.json`) | Project preferences change | "Disable `UUID_DESCRIPTIVE` in this repo" |
 
-### Why not a DSL (Option B)
+### Rule schema (v0.2.0)
 
-Option B (declarative rule language) appears to offer the same benefit as Option C (external rules without recompilation) at lower cost. It doesn't. The cost is hidden:
+Rules are JSON objects with a `where` clause (step selector) and an `assert` clause (composable assertion). Each rule specifies which tier it runs at, its severity, and its diagnostic message.
 
-1. **Every DSL becomes Turing-complete or frustrating.** The first request will be "match this pattern but only if the parent block is a try." The second will be "check this field but only when the connector is Salesforce AND the action is `search_sobjects`." Within six months, the JSON schema has conditionals, negation, and path expressions — a bad programming language.
-
-2. **DSL rules are harder to test than Go rules.** A Go rule is a function with inputs and outputs — standard `go test`. A DSL rule requires a DSL evaluator, and bugs can live in the evaluator or the rule definition. Two failure modes instead of one.
-
-3. **DSL rules can't call the recipe walker.** The datapill linter's power comes from `DatapillContext` — knowing that a string is inside `conditions[].lhs` and therefore subject to different rules. A JSON DSL can't express "walk all string values, track field path context, apply rule only in condition LHS positions." The walker is Go code. Rules that need the walker must be Go code.
-
-### The intended evolution
-
-```
-Phase 1-2:  All rules in pkg/lint/, compiled into recipe-lint plugin
-            New rules → plugin update, not CLI release
-            Solves the release coupling problem
-
-Phase 3+:   pkg/lint exports LintRule interface
-            External rule plugins implement the interface
-            recipe-lint plugin can load external rule plugins
-            Solves the custom rule problem
-
-Never:      JSON rule DSL for core logic
-            Wrong abstraction level
-```
-
-The `LintRule` interface (future):
-
-```go
-type LintRule interface {
-    ID() string
-    Tier() int
-    Check(recipe *Recipe, ctx LintContext) []LintDiagnostic
+```json
+{
+  "version": "0.2.0",
+  "rules": [
+    {
+      "rule_id": "MAX_ONE_ACTION",
+      "tier": 1,
+      "level": "error",
+      "message": "Recipe must have at most one action step",
+      "scope": "recipe",
+      "assert": {
+        "step_count": { "where": { "keyword": "action" }, "max": 1 }
+      }
+    },
+    {
+      "rule_id": "UUID_PREFIX_SF",
+      "tier": 1,
+      "level": "warn",
+      "message": "Salesforce step UUID must start with 'sf-'",
+      "scope": "step",
+      "where": { "provider": "salesforce" },
+      "assert": {
+        "field_matches": { "path": "uuid", "pattern": "^sf-" }
+      }
+    }
+  ]
 }
 ```
 
-External rule plugins are separate plugin binaries that implement this interface. The `pkg/lint` library provides the recipe walker, diagnostic types, and datapill context — external rule authors write rules against these types in Go. No DSL, no JSON rule language. Go is the rule language.
+**Matcher primitives (v0.2.0):** `field_exists`, `field_absent`, `field_matches` (regex), `field_equals` (literal), `step_count` (with selector + min/max/exact), `eis_empty`, `eis_field_type`, `all_of` (logical AND), `any_of` (logical OR).
+
+**Rule discovery:**
+- Connector skill authors: `skills/{connector}/lint-rules.json` (existing path)
+- Project teams: `.wklint/rules/*.json` (new path, follows `.wklint/profiles/` pattern)
+
+### What the original concerns got right
+
+The original "No DSL" argument raised three concerns. Two remain valid constraints on the matcher design:
+
+1. **Turing-completeness creep.** The matcher set is intentionally finite and non-recursive (except `all_of`/`any_of` composition). There are no loops, variables, or conditional assignment. New matchers are added as Go functions, not as JSON schema extensions — the barrier to adding complexity is writing and testing Go code, not expanding a schema.
+
+2. **Context-aware rules need Go.** The datapill walker's `DatapillContext` (knowing a string is in `conditions[].lhs`) remains Go-only. Rules that need walker context remain built-in Go rules. The JSON matchers operate on step fields and recipe structure — a level above string-value context.
+
+The third concern ("DSL rules are harder to test") is addressed by testing the matcher evaluators as Go functions, then testing rule files as integration tests against fixture recipes.
+
+### The evolution path
+
+```
+v0.1.0:   Connector data only (connector_internals, valid_action_names, action_rules)
+          action_rules defined but not evaluated (bug, now fixed)
+
+v0.2.0:   Declarative matchers (field_exists, field_matches, step_count, etc.)
+          Customers author rules as JSON, evaluated by the tier engine
+          Two discovery paths: skills directory + .wklint/rules/
+
+Future:   Additional matcher primitives based on beta feedback
+          Tier 2/3 matchers (graph-level assertions) if demand warrants
+          External Go plugins for matchers that can't be expressed declaratively
+```
 
 ---
 
