@@ -9,8 +9,8 @@ before:
 
 builds:
   - id: wk-lint
-    main: ./cmd/wk-lint
-    binary: wk-lint
+    main: ./cmd/recipe-lint
+    binary: recipe-lint
     env:
       - CGO_ENABLED=0
     goos:

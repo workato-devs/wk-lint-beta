@@ -11,6 +11,12 @@ import (
 	"github.com/workato-devs/wk-lint-beta/pkg/lint"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 // RPCRequest represents a JSON-RPC 2.0 request.
 type RPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
