@@ -1,14 +1,36 @@
+# Build output
 /recipe-lint
 *.exe
-*.dll
+*.dll                                                                                                                                                
 *.so
 *.dylib
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor & IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment & secrets                                                                                                                                                                           
+*.env
+
+# Agent tooling                                     
+.claude/settings.local.json
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.aider*
+
+# Test & dev artifacts
 *.test
 *.out
-.DS_Store
+coverage.out
 
-# Environment
-.env
-
-# Development artifacts
+# Project-specific
 *TODO.md
