@@ -72,14 +72,7 @@ Every `wk lint` invocation spawns the plugin binary (~10-20ms Go process startup
 
 ### Installation and distribution
 
-Phase 1 ships the plugin in the `wk-cli-beta` repo at `plugins/recipe-lint/`. Users install from a local build:
-
-```bash
-cd plugins/recipe-lint && go build -o recipe-lint . && cd ../..
-wk plugins install ./plugins/recipe-lint
-```
-
-Future: GoReleaser builds the plugin binary alongside the CLI binary. `wk plugins install recipe-lint` fetches from a release URL (GitHub Releases or a plugin registry). This is a distribution concern, not an architecture concern — it can be solved later without changing the plugin interface.
+Pre-built binaries are published to [GitHub Releases](https://github.com/workato-devs/wk-lint-beta/releases) via GoReleaser for macOS, Linux, and Windows (x86_64 and ARM64). Users download an archive, place the `recipe-lint` binary on their PATH, and register it with `wk plugins install recipe-lint`. No Go toolchain required.
 
 ---
 

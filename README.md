@@ -6,16 +6,48 @@ Teams can extend the linter with [custom rules defined in JSON](docs/rule-author
 
 ## Installation
 
-Requires [Go 1.23](https://go.dev/dl/) or later and the [`wk` CLI](https://github.com/workato-devs/wk-cli-beta).
+Requires the [`wk` CLI](https://github.com/workato-devs/wk-cli-beta).
+
+### 1. Download and install
+
+Download the archive for your platform from the [releases page](https://github.com/workato-devs/wk-lint-beta/releases).
+
+| OS | Architecture | Archive |
+|----|-------------|---------|
+| macOS | Apple Silicon (M1+) | `wk-lint_VERSION_Darwin_arm64.tar.gz` |
+| macOS | Intel | `wk-lint_VERSION_Darwin_x86_64.tar.gz` |
+| Linux | x86_64 | `wk-lint_VERSION_Linux_x86_64.tar.gz` |
+| Linux | ARM64 | `wk-lint_VERSION_Linux_arm64.tar.gz` |
+| Windows | x86_64 | `wk-lint_VERSION_Windows_x86_64.zip` |
+| Windows | ARM64 | `wk-lint_VERSION_Windows_arm64.zip` |
+
+Extract the binary and move it onto your PATH.
+
+**macOS / Linux:**
 
 ```bash
-go install github.com/workato-devs/wk-lint-beta/cmd/recipe-lint@latest
-wk plugins install recipe-lint
+tar -xzf wk-lint_<version>_<OS>_<arch>.tar.gz
+sudo mv recipe-lint /usr/local/bin/
 ```
 
-Verify the plugin is registered:
+**Windows (PowerShell):**
+
+```powershell
+Expand-Archive wk-lint_<version>_Windows_<arch>.zip -DestinationPath .
+Move-Item recipe-lint.exe "$env:LOCALAPPDATA\Microsoft\WindowsApps\"
+```
+
+### 2. Verify
 
 ```bash
+which recipe-lint   # macOS / Linux
+where recipe-lint   # Windows
+```
+
+### 3. Register as a `wk` plugin
+
+```bash
+wk plugins install recipe-lint
 wk lint --help
 ```
 

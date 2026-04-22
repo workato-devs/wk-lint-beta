@@ -451,25 +451,14 @@ The linter discovers rules from two paths:
 
 Both paths are optional. Without them, only built-in rules run.
 
-### Testing Rules Against a Recipe Corpus
+### Testing Custom Rules Against a Recipe Corpus
 
-You can validate your custom rules against a directory of real recipes using the corpus test suite. This runs every recipe through the full linter — including your custom rules — and reports diagnostics per file.
-
-Set environment variables and run:
+You can validate your custom rules against a directory of real recipes by running the linter over the whole corpus:
 
 ```bash
-RECIPE_CORPUS_DIR=./recipes \
-LINT_SKILLS_PATH=./skills \
-LINT_CONFIG_PATH=.wklintrc.json \
-  go test ./pkg/lint/ -run Corpus -v
+wk lint ./recipes/ --skills-path ./skills/ --config-path .wklintrc.json
 ```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `RECIPE_CORPUS_DIR` | yes | Path to a directory of `.recipe.json` files |
-| `LINT_SKILLS_PATH` | no | Path to your skills directory (connector `lint-rules.json` files) |
-| `LINT_CONFIG_PATH` | no | Path to your `.wklintrc.json` (loads profile, overrides, and `.wklint/rules/`) |
+This runs all four tiers — including your custom rules — on every recipe in the directory and reports diagnostics per file. Files that aren't valid recipes are skipped gracefully.
 
-The test walks `RECIPE_CORPUS_DIR` recursively, runs all four tiers on each `.json` file, and logs diagnostic counts by tier and rule ID. Files that aren't valid recipes are skipped gracefully.
-
-Without `LINT_SKILLS_PATH` or `LINT_CONFIG_PATH`, the corpus test runs built-in rules only. See `.env.example` for a template.
+Without `--skills-path` or `--config-path`, only built-in rules run.
