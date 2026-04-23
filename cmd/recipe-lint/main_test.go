@@ -244,6 +244,29 @@ func TestShutdown(t *testing.T) {
 	}
 }
 
+func TestLintRunWithEmbeddedProfile(t *testing.T) {
+	dir := testdataDir(t)
+	fixturePath := filepath.Join(dir, "fixtures", "simple_connector.recipe.json")
+
+	params, _ := json.Marshal(lintRunParams{
+		Files:   []string{fixturePath},
+		Profile: "standard",
+	})
+
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      float64(20),
+		Method:  "lint.run",
+		Params:  json.RawMessage(params),
+	}
+	resp := handleRequest(req)
+
+	if resp.Error != nil {
+		t.Fatalf("expected no RPC error with embedded profiles, got: code=%d message=%s",
+			resp.Error.Code, resp.Error.Message)
+	}
+}
+
 func TestLintRunWithMalformedFixture(t *testing.T) {
 	dir := testdataDir(t)
 	fixturePath := filepath.Join(dir, "malformed", "code_as_array.recipe.json")

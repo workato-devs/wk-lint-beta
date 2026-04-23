@@ -42,7 +42,7 @@ archives:
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
-    files: [LICENSE*, README*, plugin.toml]
+    files: [LICENSE*, README*, plugin.toml, "profiles/*"]
 
 checksum:
   name_template: "checksums.txt"
