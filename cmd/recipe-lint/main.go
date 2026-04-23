@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,7 +64,8 @@ type fileSummary struct {
 }
 
 type lintRunResult struct {
-	Files []fileDiagnostics `json:"files"`
+	ExitCode int               `json:"exit_code"`
+	Files    []fileDiagnostics `json:"files"`
 }
 
 // --- lint.pre_push types ---
@@ -170,11 +172,14 @@ func handleLintRun(req RPCRequest) RPCResponse {
 		}
 	}
 
-	result := lintRunResult{
-		Files: make([]fileDiagnostics, 0, len(params.Files)),
-	}
+	expandedFiles, dirErrors := expandFiles(params.Files)
 
-	for _, file := range params.Files {
+	result := lintRunResult{
+		Files: make([]fileDiagnostics, 0, len(expandedFiles)),
+	}
+	result.Files = append(result.Files, dirErrors...)
+
+	for _, file := range expandedFiles {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			result.Files = append(result.Files, fileDiagnostics{
@@ -237,11 +242,32 @@ func handleLintRun(req RPCRequest) RPCResponse {
 		})
 	}
 
+	result.ExitCode = computeExitCode(result.Files)
+
 	return RPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
 	}
+}
+
+func computeExitCode(files []fileDiagnostics) int {
+	hasLintError := false
+	for _, f := range files {
+		for _, d := range f.Diagnostics {
+			switch d.RuleID {
+			case "FILE_READ_ERROR", "INVALID_JSON", "LINT_ERROR":
+				return 2
+			}
+			if d.Level == lint.LevelError {
+				hasLintError = true
+			}
+		}
+	}
+	if hasLintError {
+		return 1
+	}
+	return 0
 }
 
 func handlePrePush(req RPCRequest) RPCResponse {
@@ -340,6 +366,47 @@ func handlePrePush(req RPCRequest) RPCResponse {
 		ID:      req.ID,
 		Result:  result,
 	}
+}
+
+func expandFiles(paths []string) ([]string, []fileDiagnostics) {
+	var result []string
+	var dirErrors []fileDiagnostics
+
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			result = append(result, p)
+			continue
+		}
+
+		if !info.IsDir() {
+			result = append(result, p)
+			continue
+		}
+
+		walkErr := filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() && strings.HasSuffix(path, ".recipe.json") {
+				result = append(result, path)
+			}
+			return nil
+		})
+		if walkErr != nil {
+			dirErrors = append(dirErrors, fileDiagnostics{
+				File: p,
+				Diagnostics: []lint.LintDiagnostic{{
+					Level:   lint.LevelError,
+					Message: "Cannot read directory: " + walkErr.Error(),
+					RuleID:  "FILE_READ_ERROR",
+					Tier:    0,
+				}},
+				Summary: fileSummary{Errors: 1},
+			})
+		}
+	}
+	return result, dirErrors
 }
 
 func writeResponse(resp RPCResponse) {
