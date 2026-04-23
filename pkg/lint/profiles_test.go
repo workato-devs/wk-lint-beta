@@ -209,6 +209,86 @@ func TestDiscoverProfiles_ProjectOverridesPlugin(t *testing.T) {
 	}
 }
 
+func TestLoadEmbeddedProfiles(t *testing.T) {
+	profiles, err := loadEmbeddedProfiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := profiles["standard"]; !ok {
+		t.Error("embedded profiles missing 'standard'")
+	}
+	if _, ok := profiles["strict"]; !ok {
+		t.Error("embedded profiles missing 'strict'")
+	}
+	if profiles["strict"].Extends != "standard" {
+		t.Errorf("strict.Extends = %q, want %q", profiles["strict"].Extends, "standard")
+	}
+}
+
+func TestDiscoverProfiles_EmbeddedFallback(t *testing.T) {
+	profiles, err := discoverProfiles("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := profiles["standard"]; !ok {
+		t.Error("expected embedded standard profile as fallback")
+	}
+	if _, ok := profiles["strict"]; !ok {
+		t.Error("expected embedded strict profile as fallback")
+	}
+}
+
+func TestDiscoverProfiles_DiskOverridesEmbedded(t *testing.T) {
+	tmpDir := t.TempDir()
+	pluginDir := filepath.Join(tmpDir, "plugin")
+	pluginProfilesDir := filepath.Join(pluginDir, "profiles")
+
+	writeProfile(t, pluginProfilesDir, "standard.json", `{
+		"name": "standard",
+		"rules": {"CUSTOM_RULE": "error"}
+	}`)
+
+	profiles, err := discoverProfiles("", pluginDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	prof := profiles["standard"]
+	if prof == nil {
+		t.Fatal("expected standard profile")
+	}
+	if prof.Rules["CUSTOM_RULE"] != "error" {
+		t.Error("expected disk profile to override embedded profile")
+	}
+	if _, ok := profiles["strict"]; !ok {
+		t.Error("expected embedded strict profile to remain")
+	}
+}
+
+func TestResolveChain_EmbeddedStrictExtendsStandard(t *testing.T) {
+	profiles, err := discoverProfiles("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resolved, err := resolveProfileChain("strict", profiles)
+	if err != nil {
+		t.Fatalf("unexpected error resolving strict: %v", err)
+	}
+	if len(resolved.Chain) != 2 {
+		t.Fatalf("expected chain length 2, got %d", len(resolved.Chain))
+	}
+	if resolved.Chain[0] != "strict" || resolved.Chain[1] != "standard" {
+		t.Errorf("expected chain [strict, standard], got %v", resolved.Chain)
+	}
+	if resolved.Rules["FORMULA_METHOD_INVALID"] != "error" {
+		t.Errorf("expected FORMULA_METHOD_INVALID=error in strict, got %s", resolved.Rules["FORMULA_METHOD_INVALID"])
+	}
+	if resolved.Rules["INVALID_JSON"] != "error" {
+		t.Errorf("expected INVALID_JSON=error inherited from standard, got %s", resolved.Rules["INVALID_JSON"])
+	}
+}
+
 func TestLoadProfilesFromDir_NameMustMatchFilename(t *testing.T) {
 	tmpDir := t.TempDir()
 	dir := filepath.Join(tmpDir, "profiles")

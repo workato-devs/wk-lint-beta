@@ -31,9 +31,11 @@ The ADR defines the naming convention: profile names are lowercase, underscore-s
 
 ### 2. Profiles are always external JSON data, never compiled into the binary
 
-Both Workato-shipped and customer-defined profiles are JSON files loaded from disk at lint time. The linter binary contains zero embedded profiles. This fully decouples profile updates from linter versioning — adding a new profile or adjusting an existing one is a data change, not a code change, and doesn't require a new binary release.
+Both Workato-shipped and customer-defined profiles are JSON files loaded from disk at lint time. Disk-based profiles remain the primary mechanism and can be updated independently of the binary.
 
-This is consistent with ADR 0001's treatment of connector-specific rules: `lint-rules.json` files are external data loaded at runtime, not compiled into the binary. Profiles follow the same pattern.
+**Amendment (Issue #8):** Built-in profiles (`standard`, `strict`) are also embedded in the binary via `go:embed` as a fallback. Without this, profiles are not discoverable on release binaries because the `profiles/` directory was not included in GoReleaser archives — making the entire profile system non-functional on distributed builds. The precedence chain is: embedded defaults < plugin-bundled disk profiles < project-level disk profiles. Disk profiles of the same name fully replace the embedded version, preserving the decoupling principle for updates.
+
+This is consistent with ADR 0001's treatment of connector-specific rules: `lint-rules.json` files are external data loaded at runtime. Profiles follow the same pattern, with the embedded layer providing a guaranteed baseline.
 
 ### 3. Two-tier profile discovery
 

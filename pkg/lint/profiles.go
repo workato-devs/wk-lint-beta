@@ -29,7 +29,11 @@ const maxProfileDepth = 5
 // (pluginDir) are loaded first, then project-level profiles (projectRoot/.wklint/profiles)
 // can override them by name.
 func discoverProfiles(projectRoot, pluginDir string) (map[string]*ProfileDef, error) {
-	profiles := make(map[string]*ProfileDef)
+	// Layer 0: embedded built-in profiles (lowest precedence)
+	profiles, err := loadEmbeddedProfiles()
+	if err != nil {
+		return nil, fmt.Errorf("loading embedded profiles: %w", err)
+	}
 
 	// Layer 1: plugin-bundled profiles
 	if pluginDir != "" {
