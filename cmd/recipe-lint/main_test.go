@@ -329,3 +329,152 @@ func TestResponseJSONRPCVersion(t *testing.T) {
 		t.Errorf("expected JSONRPC version 2.0, got %q", resp.JSONRPC)
 	}
 }
+
+// --- Exit code tests ---
+
+func lintRunResultFromResp(t *testing.T, resp RPCResponse) lintRunResult {
+	t.Helper()
+	if resp.Error != nil {
+		t.Fatalf("unexpected RPC error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
+	}
+	resultBytes, err := json.Marshal(resp.Result)
+	if err != nil {
+		t.Fatalf("cannot marshal result: %v", err)
+	}
+	var result lintRunResult
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		t.Fatalf("cannot unmarshal result: %v", err)
+	}
+	return result
+}
+
+func TestLintRunExitCodeZero(t *testing.T) {
+	dir := testdataDir(t)
+	params, _ := json.Marshal(lintRunParams{
+		Files: []string{filepath.Join(dir, "fixtures", "simple_connector.recipe.json")},
+	})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if result.ExitCode != 0 {
+		t.Errorf("expected exit_code 0 for valid file, got %d", result.ExitCode)
+	}
+}
+
+func TestLintRunExitCodeOne(t *testing.T) {
+	dir := testdataDir(t)
+	params, _ := json.Marshal(lintRunParams{
+		Files: []string{filepath.Join(dir, "malformed", "missing_keys.recipe.json")},
+	})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if result.ExitCode != 1 && result.ExitCode != 2 {
+		t.Errorf("expected exit_code 1 or 2 for malformed file, got %d", result.ExitCode)
+	}
+}
+
+func TestLintRunExitCodeTwo_FileNotFound(t *testing.T) {
+	params, _ := json.Marshal(lintRunParams{
+		Files: []string{"/nonexistent/path/fake.recipe.json"},
+	})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if result.ExitCode != 2 {
+		t.Errorf("expected exit_code 2 for nonexistent file, got %d", result.ExitCode)
+	}
+}
+
+func TestLintRunExitCodeTwo_InvalidJSON(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "bad.recipe.json")
+	if err := os.WriteFile(tmp, []byte("{{{"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	params, _ := json.Marshal(lintRunParams{Files: []string{tmp}})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if result.ExitCode != 2 {
+		t.Errorf("expected exit_code 2 for invalid JSON, got %d", result.ExitCode)
+	}
+}
+
+func TestLintRunExitCodePriority(t *testing.T) {
+	dir := testdataDir(t)
+	params, _ := json.Marshal(lintRunParams{
+		Files: []string{
+			"/nonexistent/path/fake.recipe.json",
+			filepath.Join(dir, "malformed", "missing_keys.recipe.json"),
+		},
+	})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if result.ExitCode != 2 {
+		t.Errorf("expected exit_code 2 (invalid input takes priority), got %d", result.ExitCode)
+	}
+}
+
+// --- Directory expansion tests ---
+
+func TestLintRunWithDirectory(t *testing.T) {
+	dir := testdataDir(t)
+	fixturesDir := filepath.Join(dir, "fixtures")
+
+	params, _ := json.Marshal(lintRunParams{Files: []string{fixturesDir}})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if len(result.Files) != 5 {
+		t.Errorf("expected 5 files from fixtures dir, got %d", len(result.Files))
+		for _, f := range result.Files {
+			t.Logf("  file: %s", f.File)
+		}
+	}
+}
+
+func TestLintRunWithMixedFileAndDirectory(t *testing.T) {
+	dir := testdataDir(t)
+	singleFile := filepath.Join(dir, "malformed", "code_as_array.recipe.json")
+	fixturesDir := filepath.Join(dir, "fixtures")
+
+	params, _ := json.Marshal(lintRunParams{Files: []string{singleFile, fixturesDir}})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if len(result.Files) != 6 {
+		t.Errorf("expected 6 files (1 explicit + 5 from dir), got %d", len(result.Files))
+		for _, f := range result.Files {
+			t.Logf("  file: %s", f.File)
+		}
+	}
+}
+
+func TestLintRunWithEmptyDirectory(t *testing.T) {
+	emptyDir := t.TempDir()
+
+	params, _ := json.Marshal(lintRunParams{Files: []string{emptyDir}})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if len(result.Files) != 0 {
+		t.Errorf("expected 0 files from empty dir, got %d", len(result.Files))
+	}
+}
+
+func TestLintRunWithNestedDirectory(t *testing.T) {
+	dir := testdataDir(t)
+
+	params, _ := json.Marshal(lintRunParams{Files: []string{dir}})
+	resp := handleRequest(RPCRequest{JSONRPC: "2.0", ID: float64(1), Method: "lint.run", Params: params})
+	result := lintRunResultFromResp(t, resp)
+
+	if len(result.Files) < 8 {
+		t.Errorf("expected at least 8 .recipe.json files from testdata tree, got %d", len(result.Files))
+		for _, f := range result.Files {
+			t.Logf("  file: %s", f.File)
+		}
+	}
+}
