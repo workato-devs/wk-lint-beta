@@ -1,0 +1,117 @@
+# Drop this into .github/workflows/ in both wk-cli-beta and wk-lint-beta.
+# Set TOOL_NAME and TOOL_REPO to match each repo (see env block below).
+# Required secret: TAP_GITHUB_TOKEN — a PAT with write access to homebrew-tap and scoop-bucket repos.
+
+name: Update Homebrew & Scoop on release
+
+on:
+  release:
+    types: [published]
+
+env:
+  # For wk-lint-beta:
+  TOOL_NAME: recipe-lint
+  TOOL_REPO: workato-devs/wk-lint-beta
+
+jobs:
+  update-package-managers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release info
+        id: release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Download release assets and compute checksums
+        id: checksums
+        run: |
+          BASE="https://github.com/${{ env.TOOL_REPO }}/releases/download/${{ steps.release.outputs.tag }}"
+          TOOL="${{ env.TOOL_NAME }}"
+
+          declare -A FILES=(
+            [darwin_arm64]="${TOOL}-darwin-arm64.tar.gz"
+            [darwin_amd64]="${TOOL}-darwin-amd64.tar.gz"
+            [linux_arm64]="${TOOL}-linux-arm64.tar.gz"
+            [linux_amd64]="${TOOL}-linux-amd64.tar.gz"
+            [windows_amd64]="${TOOL}-windows-amd64.zip"
+            [windows_arm64]="${TOOL}-windows-arm64.zip"
+          )
+
+          for key in "${!FILES[@]}"; do
+            file="${FILES[$key]}"
+            curl -sL -o "$file" "$BASE/$file"
+            sha=$(sha256sum "$file" | cut -d' ' -f1)
+            echo "${key}_sha=$sha" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Update Homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/workato-devs/homebrew-tap.git"
+          cd homebrew-tap
+
+          FORMULA="Formula/${{ env.TOOL_NAME }}.rb"
+          VERSION="${{ steps.release.outputs.version }}"
+
+          sed -i "s/version \".*\"/version \"$VERSION\"/" "$FORMULA"
+
+          update_sha() {
+            local marker="$1" sha="$2"
+            # Find the platform/arch block and update the sha256 on the next occurrence
+            python3 -c "
+          import re, sys
+          with open('$FORMULA') as f: content = f.read()
+          parts = content.split('$marker', 1)
+          if len(parts) == 2:
+              before_sha = parts[1].split('sha256', 1)
+              if len(before_sha) == 2:
+                  rest = before_sha[1].split('\n', 1)
+                  parts[1] = before_sha[0] + 'sha256 \"$sha\"' + '\n' + rest[1] if len(rest) == 2 else before_sha[0] + 'sha256 \"$sha\"'
+                  content = '$marker'.join(parts)
+          with open('$FORMULA', 'w') as f: f.write(content)
+          "
+          }
+
+          update_sha 'url.*darwin-arm64' "${{ steps.checksums.outputs.darwin_arm64_sha }}"
+          update_sha 'url.*darwin-amd64' "${{ steps.checksums.outputs.darwin_amd64_sha }}"
+          update_sha 'url.*linux-arm64' "${{ steps.checksums.outputs.linux_arm64_sha }}"
+          update_sha 'url.*linux-amd64' "${{ steps.checksums.outputs.linux_amd64_sha }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$FORMULA"
+          git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION"
+          git push
+
+      - name: Update Scoop manifest
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/workato-devs/scoop-bucket.git"
+          cd scoop-bucket
+
+          MANIFEST="bucket/${{ env.TOOL_NAME }}.json"
+          VERSION="${{ steps.release.outputs.version }}"
+          TAG="${{ steps.release.outputs.tag }}"
+          TOOL="${{ env.TOOL_NAME }}"
+          REPO="${{ env.TOOL_REPO }}"
+
+          python3 -c "
+          import json
+          with open('$MANIFEST') as f: m = json.load(f)
+          m['version'] = '$VERSION'
+          m['architecture']['64bit']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}-windows-amd64.zip'
+          m['architecture']['64bit']['hash'] = '${{ steps.checksums.outputs.windows_amd64_sha }}'
+          m['architecture']['arm64']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}-windows-arm64.zip'
+          m['architecture']['arm64']['hash'] = '${{ steps.checksums.outputs.windows_arm64_sha }}'
+          with open('$MANIFEST', 'w') as f: json.dump(m, f, indent=2)
+          "
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$MANIFEST"
+          git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION"
+          git push
