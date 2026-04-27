@@ -1,6 +1,6 @@
 version: 2
 
-project_name: wk-lint
+project_name: recipe-lint
 
 before:
   hooks:
