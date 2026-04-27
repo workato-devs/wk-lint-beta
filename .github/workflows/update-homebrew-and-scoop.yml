@@ -7,6 +7,11 @@ name: Update Homebrew & Scoop on release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to update from (e.g. v1.0.0-beta)"
+        required: true
 
 env:
   # For wk-lint-beta:
@@ -20,23 +25,29 @@ jobs:
       - name: Get release info
         id: release
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Download release assets and compute checksums
         id: checksums
         run: |
           BASE="https://github.com/${{ env.TOOL_REPO }}/releases/download/${{ steps.release.outputs.tag }}"
           TOOL="${{ env.TOOL_NAME }}"
+          VERSION="${{ steps.release.outputs.version }}"
 
           declare -A FILES=(
-            [darwin_arm64]="${TOOL}-darwin-arm64.tar.gz"
-            [darwin_amd64]="${TOOL}-darwin-amd64.tar.gz"
-            [linux_arm64]="${TOOL}-linux-arm64.tar.gz"
-            [linux_amd64]="${TOOL}-linux-amd64.tar.gz"
-            [windows_amd64]="${TOOL}-windows-amd64.zip"
-            [windows_arm64]="${TOOL}-windows-arm64.zip"
+            [darwin_arm64]="${TOOL}_${VERSION}_Darwin_arm64.tar.gz"
+            [darwin_amd64]="${TOOL}_${VERSION}_Darwin_x86_64.tar.gz"
+            [linux_arm64]="${TOOL}_${VERSION}_Linux_arm64.tar.gz"
+            [linux_amd64]="${TOOL}_${VERSION}_Linux_x86_64.tar.gz"
+            [windows_amd64]="${TOOL}_${VERSION}_Windows_x86_64.zip"
+            [windows_arm64]="${TOOL}_${VERSION}_Windows_arm64.zip"
           )
 
           for key in "${!FILES[@]}"; do
@@ -75,16 +86,15 @@ jobs:
           "
           }
 
-          update_sha 'url.*darwin-arm64' "${{ steps.checksums.outputs.darwin_arm64_sha }}"
-          update_sha 'url.*darwin-amd64' "${{ steps.checksums.outputs.darwin_amd64_sha }}"
-          update_sha 'url.*linux-arm64' "${{ steps.checksums.outputs.linux_arm64_sha }}"
-          update_sha 'url.*linux-amd64' "${{ steps.checksums.outputs.linux_amd64_sha }}"
+          update_sha 'Darwin_arm64' "${{ steps.checksums.outputs.darwin_arm64_sha }}"
+          update_sha 'Darwin_x86_64' "${{ steps.checksums.outputs.darwin_amd64_sha }}"
+          update_sha 'Linux_arm64' "${{ steps.checksums.outputs.linux_arm64_sha }}"
+          update_sha 'Linux_x86_64' "${{ steps.checksums.outputs.linux_amd64_sha }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$FORMULA"
-          git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION"
-          git push
+          git diff --cached --quiet && echo "No Homebrew changes" || { git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION" && git push; }
 
       - name: Update Scoop manifest
         env:
@@ -103,9 +113,9 @@ jobs:
           import json
           with open('$MANIFEST') as f: m = json.load(f)
           m['version'] = '$VERSION'
-          m['architecture']['64bit']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}-windows-amd64.zip'
+          m['architecture']['64bit']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}_${VERSION}_Windows_x86_64.zip'
           m['architecture']['64bit']['hash'] = '${{ steps.checksums.outputs.windows_amd64_sha }}'
-          m['architecture']['arm64']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}-windows-arm64.zip'
+          m['architecture']['arm64']['url'] = 'https://github.com/$REPO/releases/download/$TAG/${TOOL}_${VERSION}_Windows_arm64.zip'
           m['architecture']['arm64']['hash'] = '${{ steps.checksums.outputs.windows_arm64_sha }}'
           with open('$MANIFEST', 'w') as f: json.dump(m, f, indent=2)
           "
@@ -113,5 +123,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$MANIFEST"
-          git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION"
-          git push
+          git diff --cached --quiet && echo "No Scoop changes" || { git commit -m "Update ${{ env.TOOL_NAME }} to $VERSION" && git push; }
