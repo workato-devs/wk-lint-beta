@@ -1,5 +1,7 @@
 # wk lint
 
+> 🟢 **Beta — Design Partner Program**
+
 Recipe validation plugin for the `wk` CLI. Validates Workato recipe JSON files against 52 built-in rules across four tiers of analysis, from basic JSON schema checks through cross-step data flow validation. Runs as a standalone command or as an automatic pre-push gate on `wk push`.
 
 Teams can extend the linter with [custom rules defined in JSON](docs/rule-authoring.md) — no Go code required.
