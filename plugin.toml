@@ -35,3 +35,8 @@ type = "int-array"
 name = "profile"
 description = "Lint profile to use (overrides .wklintrc.json)"
 type = "string"
+
+[[commands.subcommands]]
+name = "version"
+description = "Show recipe-lint plugin version"
+method = "lint.version"
