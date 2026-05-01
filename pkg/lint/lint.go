@@ -72,6 +72,25 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		tier0Diags := lintTier0(data)
 		diags = append(diags, tier0Diags...)
 
+		// Backfill suggested_fix from builtin rule definitions: tier 0
+		// diagnostics are emitted before rules are loaded, so they miss
+		// the JSON-defined suggested_fix. Build a lookup once and stamp.
+		if len(tier0Diags) > 0 {
+			if builtinRules, err := loadBuiltinRules(); err == nil {
+				fixMap := make(map[string]string, len(builtinRules))
+				for _, r := range builtinRules {
+					if r.SuggestedFix != "" {
+						fixMap[r.RuleID] = r.SuggestedFix
+					}
+				}
+				for i := range diags {
+					if diags[i].Tier == 0 && diags[i].SuggestedFix == "" {
+						diags[i].SuggestedFix = fixMap[diags[i].RuleID]
+					}
+				}
+			}
+		}
+
 		// 5. If tier 0 has errors, stop
 		hasErrors := false
 		for _, d := range tier0Diags {
