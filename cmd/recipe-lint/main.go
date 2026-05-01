@@ -84,11 +84,12 @@ type prePushParams struct {
 }
 
 type prePushDiagnostic struct {
-	File     string `json:"file"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	Rule     string `json:"rule"`
-	Path     string `json:"path"`
+	File         string `json:"file"`
+	Severity     string `json:"severity"`
+	Message      string `json:"message"`
+	Rule         string `json:"rule"`
+	Path         string `json:"path"`
+	SuggestedFix string `json:"suggested_fix,omitempty"`
 }
 
 type prePushResult struct {
@@ -139,6 +140,16 @@ func handleRequest(req RPCRequest) RPCResponse {
 		return handleLintRun(req)
 	case "lint.pre_push":
 		return handlePrePush(req)
+	case "lint.version":
+		return RPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]interface{}{
+				"version": version,
+				"commit":  commit,
+				"date":    date,
+			},
+		}
 	case "shutdown":
 		return RPCResponse{
 			JSONRPC: "2.0",
@@ -349,11 +360,12 @@ func handlePrePush(req RPCRequest) RPCResponse {
 				path = d.Source.JSONPointer
 			}
 			result.Diagnostics = append(result.Diagnostics, prePushDiagnostic{
-				File:     file,
-				Severity: d.Level,
-				Message:  d.Message,
-				Rule:     d.RuleID,
-				Path:     path,
+				File:         file,
+				Severity:     d.Level,
+				Message:      d.Message,
+				Rule:         d.RuleID,
+				Path:         path,
+				SuggestedFix: d.SuggestedFix,
 			})
 			if d.Level == lint.LevelError {
 				result.Passed = false

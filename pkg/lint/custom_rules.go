@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
 // CustomRule defines a user-authored lint rule evaluated by the tier engine.
 type CustomRule struct {
-	RuleID  string        `json:"rule_id"`
-	Tier    int           `json:"tier"`
-	Level   string        `json:"level"`
-	Message string        `json:"message"`
-	Scope   string        `json:"scope"` // "recipe" or "step"
-	Where   *StepSelector `json:"where,omitempty"`
-	Assert  Assertion     `json:"assert"`
+	RuleID       string        `json:"rule_id"`
+	Tier         int           `json:"tier"`
+	Level        string        `json:"level"`
+	Message      string        `json:"message"`
+	SuggestedFix string        `json:"suggested_fix,omitempty"`
+	Scope        string        `json:"scope"` // "recipe" or "step"
+	Where        *StepSelector `json:"where,omitempty"`
+	Assert       Assertion     `json:"assert"`
 }
 
 // StepSelector filters which steps a step-scoped rule applies to.
@@ -156,6 +158,15 @@ func validateAssertion(a Assertion) error {
 
 	if count == 0 {
 		return fmt.Errorf("no recognized assertion type (check for typos in assertion keys)")
+	}
+	if count > 1 {
+		return fmt.Errorf("assertion must have exactly one matcher, found %d (use all_of to combine)", count)
+	}
+
+	if a.FieldMatches != nil {
+		if _, err := regexp.Compile(a.FieldMatches.Pattern); err != nil {
+			return fmt.Errorf("field_matches pattern %q is not a valid regex: %w", a.FieldMatches.Pattern, err)
+		}
 	}
 
 	for i, sub := range a.AllOf {

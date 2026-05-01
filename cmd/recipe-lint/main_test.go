@@ -217,6 +217,31 @@ func TestPrePushFiltersNonRecipeFiles(t *testing.T) {
 	}
 }
 
+func TestLintVersion(t *testing.T) {
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      float64(98),
+		Method:  "lint.version",
+	}
+	resp := handleRequest(req)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
+	}
+
+	resultBytes, _ := json.Marshal(resp.Result)
+	var result map[string]interface{}
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		t.Fatalf("cannot unmarshal result: %v", err)
+	}
+
+	for _, key := range []string{"version", "commit", "date"} {
+		if _, exists := result[key]; !exists {
+			t.Errorf("expected %q key in version response", key)
+		}
+	}
+}
+
 func TestShutdown(t *testing.T) {
 	req := RPCRequest{
 		JSONRPC: "2.0",

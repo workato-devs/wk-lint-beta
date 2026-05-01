@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
@@ -695,5 +696,85 @@ func TestEvalAssertion_EmptyAssertionFails(t *testing.T) {
 	step := &recipe.FlatStep{Code: recipe.Code{UUID: "test"}}
 	if evalAssertion(step, nil, Assertion{}) {
 		t.Error("empty assertion should return false, not silently pass")
+	}
+}
+
+func TestValidateAssertion_MultipleMatchersRejected(t *testing.T) {
+	a := Assertion{
+		FieldExists:  &AssertFieldPath{Path: "uuid"},
+		FieldMatches: &AssertFieldMatches{Path: "uuid", Pattern: "^sf-"},
+	}
+	err := validateAssertion(a)
+	if err == nil {
+		t.Fatal("expected error for assertion with multiple matchers")
+	}
+	if !strings.Contains(err.Error(), "exactly one matcher") {
+		t.Errorf("expected 'exactly one matcher' error, got: %s", err)
+	}
+}
+
+func TestValidateAssertion_InvalidRegexRejected(t *testing.T) {
+	a := Assertion{
+		FieldMatches: &AssertFieldMatches{Path: "uuid", Pattern: "[invalid("},
+	}
+	err := validateAssertion(a)
+	if err == nil {
+		t.Fatal("expected error for invalid regex pattern")
+	}
+	if !strings.Contains(err.Error(), "not a valid regex") {
+		t.Errorf("expected 'not a valid regex' error, got: %s", err)
+	}
+}
+
+func TestValidateAssertion_ValidRegexAccepted(t *testing.T) {
+	a := Assertion{
+		FieldMatches: &AssertFieldMatches{Path: "uuid", Pattern: "^sf-[a-z]+$"},
+	}
+	if err := validateAssertion(a); err != nil {
+		t.Errorf("expected valid regex to be accepted, got: %s", err)
+	}
+}
+
+func TestSuggestedFix_FlowsThroughStepScope(t *testing.T) {
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action", UUID: "step-1"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	rule := CustomRule{
+		RuleID:       "TEST_FIX",
+		Tier:         1,
+		Level:        "warn",
+		Message:      "test message",
+		SuggestedFix: "do this to fix it",
+		Scope:        "step",
+		Assert:       Assertion{FieldExists: &AssertFieldPath{Path: "input.missing"}},
+	}
+	diags := evalStepScope(parsed, rule)
+	if len(diags) == 0 {
+		t.Fatal("expected diagnostic")
+	}
+	if diags[0].SuggestedFix != "do this to fix it" {
+		t.Errorf("expected suggested_fix to flow through, got %q", diags[0].SuggestedFix)
+	}
+}
+
+func TestSuggestedFix_FlowsThroughRecipeScope(t *testing.T) {
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: recipe.Code{Keyword: "action"}, JSONPointer: "/code/block/0"},
+	}, nil)
+	rule := CustomRule{
+		RuleID:       "TEST_FIX_RECIPE",
+		Tier:         1,
+		Level:        "warn",
+		Message:      "test message",
+		SuggestedFix: "fix at recipe level",
+		Scope:        "recipe",
+		Assert:       Assertion{StepCount: &AssertStepCount{Exact: intPtr(99)}},
+	}
+	diags := evalRecipeScope(parsed, rule)
+	if len(diags) == 0 {
+		t.Fatal("expected diagnostic")
+	}
+	if diags[0].SuggestedFix != "fix at recipe level" {
+		t.Errorf("expected suggested_fix to flow through, got %q", diags[0].SuggestedFix)
 	}
 }
