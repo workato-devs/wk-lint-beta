@@ -6,25 +6,53 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/workato-devs/wk-lint-beta/pkg/igm"
 	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
 )
 
 // evalCustomRules evaluates all custom rules for the given tier and returns diagnostics.
-func evalCustomRules(parsed *recipe.ParsedRecipe, rules []CustomRule, tier int, _ *igm.Graph) []LintDiagnostic {
+func evalCustomRules(ctx *BuiltinContext, rules []CustomRule, tier int) []LintDiagnostic {
 	var diags []LintDiagnostic
 	for _, rule := range rules {
 		if rule.Tier != tier {
 			continue
 		}
+		if rule.Assert.Builtin != nil {
+			diags = append(diags, evalBuiltinRule(ctx, rule)...)
+			continue
+		}
 		switch rule.Scope {
 		case "recipe":
-			diags = append(diags, evalRecipeScope(parsed, rule)...)
+			diags = append(diags, evalRecipeScope(ctx.Parsed, rule)...)
 		case "step":
-			diags = append(diags, evalStepScope(parsed, rule)...)
+			diags = append(diags, evalStepScope(ctx.Parsed, rule)...)
 		}
 	}
 	return diags
+}
+
+// evalBuiltinRule dispatches to a registered Go function.
+func evalBuiltinRule(ctx *BuiltinContext, rule CustomRule) []LintDiagnostic {
+	name := *rule.Assert.Builtin
+	fn, ok := builtinRegistry[name]
+	if !ok {
+		return []LintDiagnostic{{
+			Level:   LevelWarn,
+			RuleID:  "BUILTIN_NOT_FOUND",
+			Message: fmt.Sprintf("builtin %q not found in registry", name),
+			Tier:    rule.Tier,
+		}}
+	}
+	rawDiags := fn(ctx, &rule)
+	for i := range rawDiags {
+		if rawDiags[i].RuleID == "" {
+			rawDiags[i].RuleID = rule.RuleID
+		}
+		if rawDiags[i].Level == "" {
+			rawDiags[i].Level = rule.Level
+		}
+		rawDiags[i].Tier = rule.Tier
+	}
+	return rawDiags
 }
 
 func evalRecipeScope(parsed *recipe.ParsedRecipe, rule CustomRule) []LintDiagnostic {
@@ -100,6 +128,9 @@ func evalAssertion(step *recipe.FlatStep, parsed *recipe.ParsedRecipe, a Asserti
 			}
 		}
 		return false
+
+	case a.Not != nil:
+		return !evalAssertion(step, parsed, *a.Not)
 
 	default:
 		return false

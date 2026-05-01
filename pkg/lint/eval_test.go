@@ -367,7 +367,7 @@ func TestEvalCustomRules_RecipeScope(t *testing.T) {
 		Assert:  Assertion{StepCount: &AssertStepCount{Where: &StepSelector{Keyword: StringOrArray{"action"}}, Max: &max1}},
 	}}
 
-	diags := evalCustomRules(parsed, rules, 1, nil)
+	diags := evalCustomRules(&BuiltinContext{Parsed: parsed}, rules, 1)
 	if !hasDiag(diags, "MAX_ONE_ACTION") {
 		t.Error("expected MAX_ONE_ACTION diagnostic")
 	}
@@ -395,7 +395,7 @@ func TestEvalCustomRules_StepScope(t *testing.T) {
 		Assert:  Assertion{FieldExists: &AssertFieldPath{Path: "input.limit"}},
 	}}
 
-	diags := evalCustomRules(parsed, rules, 1, nil)
+	diags := evalCustomRules(&BuiltinContext{Parsed: parsed}, rules, 1)
 	if !hasDiag(diags, "SEARCH_NEEDS_LIMIT") {
 		t.Error("expected SEARCH_NEEDS_LIMIT diagnostic")
 	}
@@ -417,7 +417,7 @@ func TestEvalCustomRules_TierFiltering(t *testing.T) {
 		{RuleID: "TIER2_RULE", Tier: 2, Level: "warn", Message: "t2", Scope: "step", Assert: Assertion{FieldAbsent: &AssertFieldPath{Path: "uuid"}}},
 	}
 
-	diags := evalCustomRules(parsed, rules, 1, nil)
+	diags := evalCustomRules(&BuiltinContext{Parsed: parsed}, rules, 1)
 	if !hasDiag(diags, "TIER1_RULE") {
 		t.Error("should include tier 1 rule")
 	}
@@ -442,7 +442,7 @@ func TestEvalCustomRules_StepScope_WhereFilters(t *testing.T) {
 		Assert:  Assertion{FieldMatches: &AssertFieldMatches{Path: "uuid", Pattern: "^sf-"}},
 	}}
 
-	diags := evalCustomRules(parsed, rules, 1, nil)
+	diags := evalCustomRules(&BuiltinContext{Parsed: parsed}, rules, 1)
 	if hasDiag(diags, "SF_UUID_PREFIX") {
 		t.Error("sf-001 matches ^sf-, should not produce diagnostic")
 	}
@@ -459,7 +459,7 @@ func TestEvalCustomRules_Pass(t *testing.T) {
 		Assert: Assertion{FieldExists: &AssertFieldPath{Path: "input.limit"}},
 	}}
 
-	diags := evalCustomRules(parsed, rules, 1, nil)
+	diags := evalCustomRules(&BuiltinContext{Parsed: parsed}, rules, 1)
 	if len(diags) != 0 {
 		t.Errorf("expected no diagnostics, got %d", len(diags))
 	}

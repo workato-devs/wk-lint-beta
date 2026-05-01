@@ -9,21 +9,6 @@ import (
 	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
 )
 
-// lintTier2Structure runs Tier 2 inter-step structure rules against the IGM graph.
-func lintTier2Structure(graph *igm.Graph, parsed *recipe.ParsedRecipe) []LintDiagnostic {
-	var diags []LintDiagnostic
-
-	diags = append(diags, checkCatchLastInTry(graph)...)
-	diags = append(diags, checkElseLastInIf(graph)...)
-	diags = append(diags, checkSuccessBeforeCatch(graph, parsed)...)
-	diags = append(diags, checkTerminalCoverage(graph, parsed)...)
-	diags = append(diags, checkAllPathsReturn(graph)...)
-	diags = append(diags, checkCatchReturnsAllFields(graph, parsed)...)
-	diags = append(diags, checkRecipeCallZipName(graph, parsed)...)
-
-	return diags
-}
-
 // checkCatchLastInTry verifies that a catch block is the last child in its parent try block.
 // Rule: CATCH_LAST_IN_TRY
 func checkCatchLastInTry(graph *igm.Graph) []LintDiagnostic {

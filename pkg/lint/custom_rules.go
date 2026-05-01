@@ -37,6 +37,8 @@ type Assertion struct {
 	EISFieldType *AssertEISFieldType `json:"eis_field_type,omitempty"`
 	AllOf        []Assertion         `json:"all_of,omitempty"`
 	AnyOf        []Assertion         `json:"any_of,omitempty"`
+	Not          *Assertion          `json:"not,omitempty"`
+	Builtin      *string             `json:"builtin,omitempty"`
 }
 
 // AssertFieldPath asserts a field path exists (or is absent).
@@ -145,6 +147,12 @@ func validateAssertion(a Assertion) error {
 	if len(a.AnyOf) > 0 {
 		count++
 	}
+	if a.Not != nil {
+		count++
+	}
+	if a.Builtin != nil {
+		count++
+	}
 
 	if count == 0 {
 		return fmt.Errorf("no recognized assertion type (check for typos in assertion keys)")
@@ -158,6 +166,11 @@ func validateAssertion(a Assertion) error {
 	for i, sub := range a.AnyOf {
 		if err := validateAssertion(sub); err != nil {
 			return fmt.Errorf("any_of[%d]: %w", i, err)
+		}
+	}
+	if a.Not != nil {
+		if err := validateAssertion(*a.Not); err != nil {
+			return fmt.Errorf("not: %w", err)
 		}
 	}
 

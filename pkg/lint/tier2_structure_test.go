@@ -25,9 +25,19 @@ func loadAndBuild(t *testing.T, name string) ([]byte, *recipe.ParsedRecipe, *igm
 	return data, parsed, graph
 }
 
+func evalTier2BuiltinForTest(t *testing.T, parsed *recipe.ParsedRecipe, graph *igm.Graph) []LintDiagnostic {
+	t.Helper()
+	rules, err := loadBuiltinRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &BuiltinContext{Parsed: parsed, Graph: graph}
+	return evalCustomRules(ctx, rules, 2)
+}
+
 func TestTier2_CatchLastInTry(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "simple_connector.recipe.json")
-	diags := lintTier2Structure(graph, parsed)
+	diags := evalTier2BuiltinForTest(t, parsed, graph)
 
 	// In the fixture, catch IS last in try, so no CATCH_LAST_IN_TRY diagnostic expected
 	for _, d := range diags {
@@ -39,7 +49,7 @@ func TestTier2_CatchLastInTry(t *testing.T) {
 
 func TestTier2_TerminalCoverage(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "api_endpoint_try_catch.recipe.json")
-	diags := lintTier2Structure(graph, parsed)
+	diags := evalTier2BuiltinForTest(t, parsed, graph)
 
 	// This fixture declares 200, 404, 409, 500 response codes.
 	// It has return_response for: 404 (guest not found), 200 (success), 500 (catch error)
@@ -58,7 +68,7 @@ func TestTier2_TerminalCoverage(t *testing.T) {
 
 func TestTier2_RecipeCallZipName(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "api_endpoint_try_catch.recipe.json")
-	diags := lintTier2Structure(graph, parsed)
+	diags := evalTier2BuiltinForTest(t, parsed, graph)
 
 	// Recipe calls in this fixture DO have zip_name, so no diagnostic expected
 	for _, d := range diags {
@@ -70,7 +80,7 @@ func TestTier2_RecipeCallZipName(t *testing.T) {
 
 func TestTier2_AllPathsReturn(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "simple_connector.recipe.json")
-	diags := lintTier2Structure(graph, parsed)
+	diags := evalTier2BuiltinForTest(t, parsed, graph)
 
 	// Simple connector has return_result in both try and catch paths,
 	// so no ALL_PATHS_RETURN expected (both paths terminate)
@@ -83,7 +93,7 @@ func TestTier2_AllPathsReturn(t *testing.T) {
 
 func TestTier2_SuccessBeforeCatch(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "api_endpoint_try_catch.recipe.json")
-	diags := lintTier2Structure(graph, parsed)
+	diags := evalTier2BuiltinForTest(t, parsed, graph)
 
 	// In this fixture, 200 success is in try body (correct), not in catch
 	for _, d := range diags {

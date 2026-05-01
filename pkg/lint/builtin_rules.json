@@ -1,0 +1,443 @@
+{
+  "version": "0.2.0",
+  "rules": [
+    {
+      "rule_id": "INVALID_JSON",
+      "tier": 0,
+      "level": "error",
+      "message": "Recipe is not valid JSON",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "CODE_WRAPPED_IN_RECIPE",
+      "tier": 0,
+      "level": "error",
+      "message": "Top-level should not have a \"recipe\" key wrapping everything",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "MISSING_TOP_LEVEL_KEYS",
+      "tier": 0,
+      "level": "error",
+      "message": "Missing required top-level key",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "CODE_NOT_OBJECT",
+      "tier": 0,
+      "level": "error",
+      "message": "Code value must be a JSON object",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "CONFIG_INVALID",
+      "tier": 0,
+      "level": "error",
+      "message": "Config section is invalid",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "STEP_MISSING_KEYWORD",
+      "tier": 0,
+      "level": "error",
+      "message": "Step is missing required keyword field",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "STEP_MISSING_NUMBER",
+      "tier": 0,
+      "level": "error",
+      "message": "Step is missing required number field",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "NUMBER_NOT_INTEGER",
+      "tier": 0,
+      "level": "error",
+      "message": "Step number must be an integer",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "STEP_MISSING_UUID",
+      "tier": 0,
+      "level": "error",
+      "message": "Step is missing required uuid field",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+    {
+      "rule_id": "UUID_TOO_LONG",
+      "tier": 0,
+      "level": "error",
+      "message": "UUID exceeds maximum length",
+      "scope": "recipe",
+      "assert": { "builtin": "__tier0__" }
+    },
+
+    {
+      "rule_id": "RESPONSE_CODES_DEFINED",
+      "tier": 1,
+      "level": "info",
+      "message": "API platform trigger should define response codes in input",
+      "scope": "step",
+      "where": {
+        "keyword": "trigger",
+        "provider": "workato_api_platform"
+      },
+      "assert": {
+        "field_exists": {
+          "path": "input.response.responses"
+        }
+      }
+    },
+    {
+      "rule_id": "IF_NO_PROVIDER",
+      "tier": 1,
+      "level": "warn",
+      "message": "\"if\" step should not have a provider",
+      "scope": "step",
+      "where": { "keyword": "if" },
+      "assert": { "field_absent": { "path": "provider" } }
+    },
+    {
+      "rule_id": "ELSE_NO_PROVIDER",
+      "tier": 1,
+      "level": "warn",
+      "message": "\"else\" step should not have a provider",
+      "scope": "step",
+      "where": { "keyword": "else" },
+      "assert": { "field_absent": { "path": "provider" } }
+    },
+    {
+      "rule_id": "CATCH_PROVIDER_NULL",
+      "tier": 1,
+      "level": "warn",
+      "message": "\"catch\" step should not have a provider",
+      "scope": "step",
+      "where": { "keyword": "catch" },
+      "assert": { "field_absent": { "path": "provider" } }
+    },
+    {
+      "rule_id": "CATCH_HAS_AS",
+      "tier": 1,
+      "level": "warn",
+      "message": "\"catch\" step should have a non-empty \"as\" field",
+      "scope": "step",
+      "where": { "keyword": "catch" },
+      "assert": { "field_exists": { "path": "as" } }
+    },
+    {
+      "rule_id": "TRY_NO_AS",
+      "tier": 1,
+      "level": "warn",
+      "message": "\"try\" step should have an empty \"as\" field",
+      "scope": "step",
+      "where": { "keyword": "try" },
+      "assert": { "field_absent": { "path": "as" } }
+    },
+    {
+      "rule_id": "CATCH_HAS_RETRY",
+      "tier": 1,
+      "level": "info",
+      "message": "\"catch\" step input should have \"max_retry_count\"",
+      "scope": "step",
+      "where": { "keyword": "catch" },
+      "assert": { "field_exists": { "path": "input.max_retry_count" } }
+    },
+    {
+      "rule_id": "NO_ELSIF",
+      "tier": 1,
+      "level": "error",
+      "message": "\"elsif\" keyword is not allowed; use nested if/else instead",
+      "scope": "step",
+      "where": { "keyword": "elsif" },
+      "assert": { "field_absent": { "path": "keyword" } }
+    },
+
+    {
+      "rule_id": "STEP_NUMBERING",
+      "tier": 1,
+      "level": "warn",
+      "message": "Step numbering is not sequential",
+      "scope": "recipe",
+      "assert": { "builtin": "check_step_numbering" }
+    },
+    {
+      "rule_id": "UUID_UNIQUE",
+      "tier": 1,
+      "level": "error",
+      "message": "Duplicate step UUID",
+      "scope": "recipe",
+      "assert": { "builtin": "check_uuid_unique" }
+    },
+    {
+      "rule_id": "UUID_DESCRIPTIVE",
+      "tier": 1,
+      "level": "warn",
+      "message": "UUID looks like a standard UUID v4; consider using a descriptive name",
+      "scope": "recipe",
+      "assert": { "builtin": "check_uuid_descriptive" }
+    },
+    {
+      "rule_id": "TRIGGER_NUMBER_ZERO",
+      "tier": 1,
+      "level": "error",
+      "message": "Trigger step must have number 0",
+      "scope": "recipe",
+      "assert": { "builtin": "check_trigger_number_zero" }
+    },
+    {
+      "rule_id": "FILENAME_MATCH",
+      "tier": 1,
+      "level": "warn",
+      "message": "Recipe name does not match filename",
+      "scope": "recipe",
+      "assert": { "builtin": "check_filename_match" }
+    },
+    {
+      "rule_id": "CONFIG_NO_WORKATO",
+      "tier": 1,
+      "level": "warn",
+      "message": "Config should not list \"workato\" as a provider",
+      "scope": "recipe",
+      "assert": { "builtin": "check_config_no_workato" }
+    },
+    {
+      "rule_id": "CONFIG_PROVIDER_MATCH",
+      "tier": 1,
+      "level": "warn",
+      "message": "Step provider not found in config",
+      "scope": "recipe",
+      "assert": { "builtin": "check_config_provider_match" }
+    },
+    {
+      "rule_id": "ACTION_NAME_VALID",
+      "tier": 1,
+      "level": "error",
+      "message": "Action name is not valid for its provider",
+      "scope": "recipe",
+      "assert": { "builtin": "check_action_name_valid" }
+    },
+    {
+      "rule_id": "ACTION_RULES",
+      "tier": 1,
+      "level": "warn",
+      "message": "Connector action rule violation",
+      "scope": "recipe",
+      "assert": { "builtin": "check_action_rules" }
+    },
+
+    {
+      "rule_id": "DP_VALID_JSON",
+      "tier": 1,
+      "level": "error",
+      "message": "Datapill payload is not valid JSON",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_LHS_NO_FORMULA",
+      "tier": 1,
+      "level": "warn",
+      "message": "Condition input should be a datapill, not a formula expression",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_INTERPOLATION_SINGLE",
+      "tier": 1,
+      "level": "warn",
+      "message": "Single datapill in formula mode — use interpolation mode instead",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_FORMULA_CONCAT",
+      "tier": 1,
+      "level": "warn",
+      "message": "Multiple datapills using interpolation — consider formula mode",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_NO_OUTER_PARENS",
+      "tier": 1,
+      "level": "info",
+      "message": "Formula wrapped in unnecessary outer parentheses",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_NO_BODY_NATIVE",
+      "tier": 1,
+      "level": "warn",
+      "message": "Datapill path contains \"body\" but step provider is not an API platform connector",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
+      "rule_id": "DP_CATCH_PROVIDER",
+      "tier": 1,
+      "level": "warn",
+      "message": "Datapill references catch alias with null provider",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+
+    {
+      "rule_id": "EIS_MIRRORS_INPUT",
+      "tier": 1,
+      "level": "warn",
+      "message": "Input field not found in extended_input_schema",
+      "scope": "recipe",
+      "assert": { "builtin": "check_eis" }
+    },
+    {
+      "rule_id": "EIS_NAME_MATCH",
+      "tier": 1,
+      "level": "warn",
+      "message": "EIS field not found in input",
+      "scope": "recipe",
+      "assert": { "builtin": "check_eis" }
+    },
+    {
+      "rule_id": "EIS_NESTED_MATCH",
+      "tier": 1,
+      "level": "warn",
+      "message": "Input field is a nested object but EIS field lacks properties",
+      "scope": "recipe",
+      "assert": { "builtin": "check_eis" }
+    },
+    {
+      "rule_id": "EIS_NO_CONNECTOR_INTERNAL",
+      "tier": 1,
+      "level": "warn",
+      "message": "EIS field is a connector-internal field",
+      "scope": "recipe",
+      "assert": { "builtin": "check_eis" }
+    },
+    {
+      "rule_id": "EIS_OUTPUT_MIRRORS_INPUT",
+      "tier": 1,
+      "level": "info",
+      "message": "EIS field not found in extended_output_schema for return_result action",
+      "scope": "recipe",
+      "assert": { "builtin": "check_eis" }
+    },
+
+    {
+      "rule_id": "FORMULA_METHOD_INVALID",
+      "tier": 1,
+      "level": "warn",
+      "message": "Unknown formula method not in Workato formula allowlist",
+      "scope": "recipe",
+      "assert": { "builtin": "check_formulas" }
+    },
+    {
+      "rule_id": "FORMULA_FORBIDDEN_PATTERN",
+      "tier": 1,
+      "level": "warn",
+      "message": "Formula contains a forbidden pattern",
+      "scope": "recipe",
+      "assert": { "builtin": "check_formulas" }
+    },
+
+    {
+      "rule_id": "CATCH_LAST_IN_TRY",
+      "tier": 2,
+      "level": "error",
+      "message": "Catch block must be the last child in its try block",
+      "scope": "recipe",
+      "assert": { "builtin": "check_catch_last_in_try" }
+    },
+    {
+      "rule_id": "ELSE_LAST_IN_IF",
+      "tier": 2,
+      "level": "error",
+      "message": "Else block must be the last child in its if block",
+      "scope": "recipe",
+      "assert": { "builtin": "check_else_last_in_if" }
+    },
+    {
+      "rule_id": "SUCCESS_BEFORE_CATCH",
+      "tier": 2,
+      "level": "warn",
+      "message": "Success response is inside catch block — should be in try body",
+      "scope": "recipe",
+      "assert": { "builtin": "check_success_before_catch" }
+    },
+    {
+      "rule_id": "TERMINAL_COVERAGE",
+      "tier": 2,
+      "level": "warn",
+      "message": "Declared response code has no corresponding return_response",
+      "scope": "recipe",
+      "assert": { "builtin": "check_terminal_coverage" }
+    },
+    {
+      "rule_id": "ALL_PATHS_RETURN",
+      "tier": 2,
+      "level": "warn",
+      "message": "Control flow path does not terminate with return_response/return_result",
+      "scope": "recipe",
+      "assert": { "builtin": "check_all_paths_return" }
+    },
+    {
+      "rule_id": "CATCH_RETURNS_ALL_FIELDS",
+      "tier": 2,
+      "level": "warn",
+      "message": "Catch return_response missing required response body field",
+      "scope": "recipe",
+      "assert": { "builtin": "check_catch_returns_all_fields" }
+    },
+    {
+      "rule_id": "RECIPE_CALL_ZIP_NAME",
+      "tier": 2,
+      "level": "warn",
+      "message": "Recipe call is missing input.flow_id.zip_name",
+      "scope": "recipe",
+      "assert": { "builtin": "check_recipe_call_zip_name" }
+    },
+
+    {
+      "rule_id": "DP_LINE_RESOLVES",
+      "tier": 3,
+      "level": "warn",
+      "message": "Datapill references step which does not match any step alias",
+      "scope": "recipe",
+      "assert": { "builtin": "check_dataflow" }
+    },
+    {
+      "rule_id": "DP_PROVIDER_MATCHES",
+      "tier": 3,
+      "level": "warn",
+      "message": "Datapill provider does not match resolved step provider",
+      "scope": "recipe",
+      "assert": { "builtin": "check_dataflow" }
+    },
+    {
+      "rule_id": "DP_STEP_REACHABLE",
+      "tier": 3,
+      "level": "warn",
+      "message": "Datapill references step not reachable from current step",
+      "scope": "recipe",
+      "assert": { "builtin": "check_dataflow" }
+    },
+    {
+      "rule_id": "DP_TRIGGER_PATH",
+      "tier": 3,
+      "level": "info",
+      "message": "API endpoint datapill path should start with \"request\"",
+      "scope": "recipe",
+      "assert": { "builtin": "check_dataflow" }
+    }
+  ]
+}

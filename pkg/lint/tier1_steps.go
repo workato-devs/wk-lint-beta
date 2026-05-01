@@ -19,29 +19,6 @@ var internalProviders = map[string]bool{
 // uuidV4Regex matches standard UUID v4 format.
 var uuidV4Regex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-// lintTier1Steps runs Tier 1 step-level lint rules on a parsed recipe.
-func lintTier1Steps(parsed *recipe.ParsedRecipe, filename string, connRules map[string]*ConnectorRules) []LintDiagnostic {
-	var diags []LintDiagnostic
-
-	diags = append(diags, checkStepNumbering(parsed)...)
-	diags = append(diags, checkUUIDUnique(parsed)...)
-	diags = append(diags, checkUUIDDescriptive(parsed)...)
-	diags = append(diags, checkTriggerNumberZero(parsed)...)
-	diags = append(diags, checkFilenameMatch(parsed, filename)...)
-	diags = append(diags, checkConfigNoWorkato(parsed)...)
-	diags = append(diags, checkConfigProviderMatch(parsed, connRules)...)
-	diags = append(diags, checkActionNameValid(parsed, connRules)...)
-	diags = append(diags, checkActionRules(parsed, connRules)...)
-	diags = append(diags, checkControlFlowRules(parsed)...)
-	diags = append(diags, checkNoElsif(parsed)...)
-	diags = append(diags, checkResponseCodesDefined(parsed)...)
-	diags = append(diags, checkFormulaMethods(parsed)...)
-	diags = append(diags, checkDatapillsWithCatchAliases(parsed, connRules)...)
-	diags = append(diags, checkEIS(parsed, connRules)...)
-
-	return diags
-}
-
 // checkStepNumbering verifies steps are numbered 0,1,2,... sequentially.
 func checkStepNumbering(parsed *recipe.ParsedRecipe) []LintDiagnostic {
 	var diags []LintDiagnostic
@@ -227,125 +204,6 @@ func checkConfigProviderMatch(parsed *recipe.ParsedRecipe, connRules map[string]
 	return diags
 }
 
-// checkControlFlowRules checks if/else/catch/try keyword rules.
-func checkControlFlowRules(parsed *recipe.ParsedRecipe) []LintDiagnostic {
-	var diags []LintDiagnostic
-
-	for _, step := range parsed.Steps {
-		switch step.Code.Keyword {
-		case "if":
-			// IF_NO_PROVIDER: if keyword -> provider should be nil
-			if step.Code.Provider != nil {
-				diags = append(diags, LintDiagnostic{
-					Level:   LevelWarn,
-					Message: "\"if\" step should not have a provider",
-					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/provider"},
-					RuleID:  "IF_NO_PROVIDER",
-					Tier:    1,
-				})
-			}
-
-		case "else":
-			// ELSE_NO_PROVIDER: else keyword -> provider should be nil
-			if step.Code.Provider != nil {
-				diags = append(diags, LintDiagnostic{
-					Level:   LevelWarn,
-					Message: "\"else\" step should not have a provider",
-					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/provider"},
-					RuleID:  "ELSE_NO_PROVIDER",
-					Tier:    1,
-				})
-			}
-
-		case "catch":
-			// CATCH_PROVIDER_NULL: catch keyword -> provider should be nil
-			if step.Code.Provider != nil {
-				diags = append(diags, LintDiagnostic{
-					Level:   LevelWarn,
-					Message: "\"catch\" step should not have a provider",
-					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/provider"},
-					RuleID:  "CATCH_PROVIDER_NULL",
-					Tier:    1,
-				})
-			}
-
-			// CATCH_HAS_AS: catch keyword -> "as" should be non-empty
-			if step.Code.As == "" {
-				diags = append(diags, LintDiagnostic{
-					Level:   LevelWarn,
-					Message: "\"catch\" step should have a non-empty \"as\" field",
-					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/as"},
-					RuleID:  "CATCH_HAS_AS",
-					Tier:    1,
-				})
-			}
-
-			// CATCH_HAS_RETRY: catch input should have max_retry_count
-			diags = append(diags, checkCatchRetry(step)...)
-
-		case "try":
-			// TRY_NO_AS: try keyword -> "as" should be empty
-			if step.Code.As != "" {
-				diags = append(diags, LintDiagnostic{
-					Level:   LevelWarn,
-					Message: "\"try\" step should have an empty \"as\" field",
-					Source:  &SourceRef{JSONPointer: step.JSONPointer + "/as"},
-					RuleID:  "TRY_NO_AS",
-					Tier:    1,
-				})
-			}
-		}
-	}
-	return diags
-}
-
-// checkCatchRetry checks that a catch step's input contains max_retry_count.
-func checkCatchRetry(step recipe.FlatStep) []LintDiagnostic {
-	var diags []LintDiagnostic
-	if step.Code.Input == nil {
-		diags = append(diags, LintDiagnostic{
-			Level:   LevelInfo,
-			Message: "\"catch\" step input should have \"max_retry_count\"",
-			Source:  &SourceRef{JSONPointer: step.JSONPointer + "/input"},
-			RuleID:  "CATCH_HAS_RETRY",
-			Tier:    1,
-		})
-		return diags
-	}
-
-	var inputMap map[string]json.RawMessage
-	if err := json.Unmarshal(step.Code.Input, &inputMap); err != nil {
-		return diags
-	}
-	if _, ok := inputMap["max_retry_count"]; !ok {
-		diags = append(diags, LintDiagnostic{
-			Level:   LevelInfo,
-			Message: "\"catch\" step input should have \"max_retry_count\"",
-			Source:  &SourceRef{JSONPointer: step.JSONPointer + "/input"},
-			RuleID:  "CATCH_HAS_RETRY",
-			Tier:    1,
-		})
-	}
-	return diags
-}
-
-// checkNoElsif verifies no step uses the "elsif" keyword.
-func checkNoElsif(parsed *recipe.ParsedRecipe) []LintDiagnostic {
-	var diags []LintDiagnostic
-	for _, step := range parsed.Steps {
-		if step.Code.Keyword == "elsif" {
-			diags = append(diags, LintDiagnostic{
-				Level:   LevelError,
-				Message: "\"elsif\" keyword is not allowed; use nested if/else instead",
-				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/keyword"},
-				RuleID:  "NO_ELSIF",
-				Tier:    1,
-			})
-		}
-	}
-	return diags
-}
-
 // checkActionNameValid verifies that action names are valid for their provider.
 func checkActionNameValid(parsed *recipe.ParsedRecipe, connRules map[string]*ConnectorRules) []LintDiagnostic {
 	var diags []LintDiagnostic
@@ -380,44 +238,6 @@ func checkActionNameValid(parsed *recipe.ParsedRecipe, connRules map[string]*Con
 				Message: fmt.Sprintf("Action name %q is not valid for provider %q; expected one of %v", step.Code.Name, provider, cr.ValidActionNames),
 				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/name"},
 				RuleID:  "ACTION_NAME_VALID",
-				Tier:    1,
-			})
-		}
-	}
-	return diags
-}
-
-// checkResponseCodesDefined checks that API platform triggers have response codes.
-func checkResponseCodesDefined(parsed *recipe.ParsedRecipe) []LintDiagnostic {
-	var diags []LintDiagnostic
-	for _, step := range parsed.Steps {
-		if step.Code.Keyword != "trigger" {
-			continue
-		}
-		if step.Code.Provider == nil || *step.Code.Provider != "workato_api_platform" {
-			continue
-		}
-		// Check input for response codes
-		if step.Code.Input == nil {
-			diags = append(diags, LintDiagnostic{
-				Level:   LevelInfo,
-				Message: "API platform trigger should define response codes in input",
-				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/input"},
-				RuleID:  "RESPONSE_CODES_DEFINED",
-				Tier:    1,
-			})
-			continue
-		}
-		var inputMap map[string]json.RawMessage
-		if err := json.Unmarshal(step.Code.Input, &inputMap); err != nil {
-			continue
-		}
-		if _, ok := inputMap["response_codes"]; !ok {
-			diags = append(diags, LintDiagnostic{
-				Level:   LevelInfo,
-				Message: "API platform trigger should define response codes in input",
-				Source:  &SourceRef{JSONPointer: step.JSONPointer + "/input"},
-				RuleID:  "RESPONSE_CODES_DEFINED",
 				Tier:    1,
 			})
 		}
