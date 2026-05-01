@@ -107,22 +107,34 @@ Rules not listed in a profile use their hardcoded default severity (shown in the
 
 Extends `standard`. Escalates key validation rules to errors, suitable for recipes headed to production.
 
-| Rule ID | Escalated to |
-|---------|-------------|
-| `ACTION_NAME_VALID` | error |
-| `FORMULA_METHOD_INVALID` | error |
-| `FORMULA_FORBIDDEN_PATTERN` | error |
-| `DP_VALID_JSON` | error |
-| `DP_LHS_NO_FORMULA` | error |
-| `EIS_MIRRORS_INPUT` | error |
-| `EIS_NAME_MATCH` | error |
-| `ALL_PATHS_RETURN` | error |
-| `TERMINAL_COVERAGE` | error |
-| `CATCH_RETURNS_ALL_FIELDS` | error |
-| `RECIPE_CALL_ZIP_NAME` | error |
-| `DP_LINE_RESOLVES` | error |
-| `DP_PROVIDER_MATCHES` | error |
-| `DP_STEP_REACHABLE` | error |
+#### Profile comparison
+
+Rules where `standard` and `strict` differ are shown below. Rules not listed are identical in both profiles.
+
+| Rule ID | Tier | `standard` | `strict` |
+|---------|------|-----------|----------|
+| `ACTION_NAME_VALID` | 1 | warn | **error** |
+| `RESPONSE_CODES_DEFINED` | 1 | info | **warn** |
+| `IF_NO_PROVIDER` | 1 | warn | **error** |
+| `ELSE_NO_PROVIDER` | 1 | warn | **error** |
+| `CATCH_PROVIDER_NULL` | 1 | warn | **error** |
+| `CATCH_HAS_AS` | 1 | warn | **error** |
+| `TRY_NO_AS` | 1 | warn | **error** |
+| `CATCH_HAS_RETRY` | 1 | info | **warn** |
+| `CONFIG_NO_WORKATO` | 1 | warn | **error** |
+| `CONFIG_PROVIDER_MATCH` | 1 | warn | **error** |
+| `FORMULA_METHOD_INVALID` | 1 | warn | **error** |
+| `FORMULA_FORBIDDEN_PATTERN` | 1 | warn | **error** |
+| `DP_LHS_NO_FORMULA` | 1 | warn | **error** |
+| `EIS_MIRRORS_INPUT` | 1 | warn | **error** |
+| `EIS_NAME_MATCH` | 1 | warn | **error** |
+| `TERMINAL_COVERAGE` | 2 | warn | **error** |
+| `ALL_PATHS_RETURN` | 2 | warn | **error** |
+| `CATCH_RETURNS_ALL_FIELDS` | 2 | warn | **error** |
+| `RECIPE_CALL_ZIP_NAME` | 2 | warn | **error** |
+| `DP_LINE_RESOLVES` | 3 | warn | **error** |
+| `DP_PROVIDER_MATCHES` | 3 | warn | **error** |
+| `DP_STEP_REACHABLE` | 3 | warn | **error** |
 
 ### Custom Profiles
 
