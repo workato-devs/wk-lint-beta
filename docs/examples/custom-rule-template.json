@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "rules": [
+    {
+      "rule_id": "EXAMPLE_FIELD_REQUIRED",
+      "tier": 1,
+      "level": "warn",
+      "message": "Salesforce action missing sobject_name in input",
+      "suggested_fix": "Add \"sobject_name\" to the step's input.",
+      "scope": "step",
+      "where": { "provider": "salesforce", "keyword": "action" },
+      "assert": {
+        "field_exists": { "path": "input.sobject_name" }
+      }
+    },
+    {
+      "rule_id": "EXAMPLE_UUID_PREFIX",
+      "tier": 1,
+      "level": "warn",
+      "message": "Step UUID should start with connector prefix",
+      "suggested_fix": "Rename the UUID to start with your connector prefix (e.g., \"sf-lookup-account\").",
+      "scope": "step",
+      "where": { "provider": "salesforce" },
+      "assert": {
+        "field_matches": { "path": "uuid", "pattern": "^sf-" }
+      }
+    },
+    {
+      "rule_id": "EXAMPLE_MAX_ACTIONS",
+      "tier": 1,
+      "level": "error",
+      "message": "Recipe must have at most 10 action steps",
+      "suggested_fix": "Split the recipe into smaller callable recipes.",
+      "scope": "recipe",
+      "assert": {
+        "step_count": { "where": { "keyword": "action" }, "max": 10 }
+      }
+    },
+    {
+      "rule_id": "EXAMPLE_COMBINED_CHECK",
+      "tier": 1,
+      "level": "warn",
+      "message": "REST action must have both URL and method in input",
+      "suggested_fix": "Add \"url\" and \"method\" to the REST step's input.",
+      "scope": "step",
+      "where": { "provider": "rest", "keyword": "action" },
+      "assert": {
+        "all_of": [
+          { "field_exists": { "path": "input.url" } },
+          { "field_exists": { "path": "input.method" } }
+        ]
+      }
+    }
+  ]
+}
