@@ -6,6 +6,7 @@
       "tier": 0,
       "level": "error",
       "message": "Recipe is not valid JSON",
+      "suggested_fix": "Check for trailing commas, missing quotes, or unbalanced braces.",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -14,6 +15,7 @@
       "tier": 0,
       "level": "error",
       "message": "Top-level should not have a \"recipe\" key wrapping everything",
+      "suggested_fix": "Remove the outer \"recipe\" key — export the code object directly as the top-level structure.",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -22,6 +24,7 @@
       "tier": 0,
       "level": "error",
       "message": "Missing required top-level key",
+      "suggested_fix": "Add the missing key to the recipe object. Required top-level keys: \"name\", \"code\", \"config\".",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -30,6 +33,7 @@
       "tier": 0,
       "level": "error",
       "message": "Code value must be a JSON object",
+      "suggested_fix": "Ensure \"code\" is a JSON object ({...}), not an array or primitive.",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -38,6 +42,7 @@
       "tier": 0,
       "level": "error",
       "message": "Config section is invalid",
+      "suggested_fix": "Ensure \"config\" is an array of objects, each with \"keyword\" set to \"application\".",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -46,6 +51,7 @@
       "tier": 0,
       "level": "error",
       "message": "Step is missing required keyword field",
+      "suggested_fix": "Add a \"keyword\" field to the step (e.g., \"action\", \"trigger\", \"if\").",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -54,6 +60,7 @@
       "tier": 0,
       "level": "error",
       "message": "Step is missing required number field",
+      "suggested_fix": "Add a \"number\" field to the step with a sequential integer value.",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -62,6 +69,7 @@
       "tier": 0,
       "level": "error",
       "message": "Step number must be an integer",
+      "suggested_fix": "Change the \"number\" field to an integer (e.g., 1 instead of 1.5 or \"1\").",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -70,6 +78,7 @@
       "tier": 0,
       "level": "error",
       "message": "Step is missing required uuid field",
+      "suggested_fix": "Add a \"uuid\" field with a unique descriptive identifier (e.g., \"lookup-account\").",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -78,6 +87,7 @@
       "tier": 0,
       "level": "error",
       "message": "UUID exceeds maximum length",
+      "suggested_fix": "Shorten the UUID to 36 characters or fewer.",
       "scope": "recipe",
       "assert": { "builtin": "__tier0__" }
     },
@@ -87,6 +97,7 @@
       "tier": 1,
       "level": "info",
       "message": "API platform trigger should define response codes in input",
+      "suggested_fix": "Add a \"response\" object with a \"responses\" array to the trigger's input.",
       "scope": "step",
       "where": {
         "keyword": "trigger",
@@ -103,6 +114,7 @@
       "tier": 1,
       "level": "warn",
       "message": "\"if\" step should not have a provider",
+      "suggested_fix": "Remove the \"provider\" field from the if step.",
       "scope": "step",
       "where": { "keyword": "if" },
       "assert": { "field_absent": { "path": "provider" } }
@@ -112,6 +124,7 @@
       "tier": 1,
       "level": "warn",
       "message": "\"else\" step should not have a provider",
+      "suggested_fix": "Remove the \"provider\" field from the else step.",
       "scope": "step",
       "where": { "keyword": "else" },
       "assert": { "field_absent": { "path": "provider" } }
@@ -121,6 +134,7 @@
       "tier": 1,
       "level": "warn",
       "message": "\"catch\" step should not have a provider",
+      "suggested_fix": "Remove the \"provider\" field from the catch step.",
       "scope": "step",
       "where": { "keyword": "catch" },
       "assert": { "field_absent": { "path": "provider" } }
@@ -130,6 +144,7 @@
       "tier": 1,
       "level": "warn",
       "message": "\"catch\" step should have a non-empty \"as\" field",
+      "suggested_fix": "Add an \"as\" field to the catch step (e.g., \"as\": \"catch-error\").",
       "scope": "step",
       "where": { "keyword": "catch" },
       "assert": { "field_exists": { "path": "as" } }
@@ -139,6 +154,7 @@
       "tier": 1,
       "level": "warn",
       "message": "\"try\" step should have an empty \"as\" field",
+      "suggested_fix": "Remove the \"as\" field from the try step — only the catch step should have an alias.",
       "scope": "step",
       "where": { "keyword": "try" },
       "assert": { "field_absent": { "path": "as" } }
@@ -148,6 +164,7 @@
       "tier": 1,
       "level": "info",
       "message": "\"catch\" step input should have \"max_retry_count\"",
+      "suggested_fix": "Add \"max_retry_count\" to the catch step's input for retry configuration.",
       "scope": "step",
       "where": { "keyword": "catch" },
       "assert": { "field_exists": { "path": "input.max_retry_count" } }
@@ -157,6 +174,7 @@
       "tier": 1,
       "level": "error",
       "message": "\"elsif\" keyword is not allowed; use nested if/else instead",
+      "suggested_fix": "Replace \"elsif\" with a nested if/else structure inside the else block.",
       "scope": "step",
       "where": { "keyword": "elsif" },
       "assert": { "field_absent": { "path": "keyword" } }
@@ -167,6 +185,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Step numbering is not sequential",
+      "suggested_fix": "Renumber steps sequentially: trigger is 0, then 1, 2, 3, etc.",
       "scope": "recipe",
       "assert": { "builtin": "check_step_numbering" }
     },
@@ -175,6 +194,7 @@
       "tier": 1,
       "level": "error",
       "message": "Duplicate step UUID",
+      "suggested_fix": "Give each step a unique UUID — no two steps should share the same value.",
       "scope": "recipe",
       "assert": { "builtin": "check_uuid_unique" }
     },
@@ -183,6 +203,7 @@
       "tier": 1,
       "level": "warn",
       "message": "UUID looks like a standard UUID v4; consider using a descriptive name",
+      "suggested_fix": "Replace the auto-generated UUID with a descriptive name (e.g., \"lookup-salesforce-account\").",
       "scope": "recipe",
       "assert": { "builtin": "check_uuid_descriptive" }
     },
@@ -191,6 +212,7 @@
       "tier": 1,
       "level": "error",
       "message": "Trigger step must have number 0",
+      "suggested_fix": "Set the trigger step's \"number\" field to 0.",
       "scope": "recipe",
       "assert": { "builtin": "check_trigger_number_zero" }
     },
@@ -199,6 +221,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Recipe name does not match filename",
+      "suggested_fix": "Rename the file to match the recipe's \"name\" field (lowercased, spaces replaced with hyphens).",
       "scope": "recipe",
       "assert": { "builtin": "check_filename_match" }
     },
@@ -207,6 +230,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Config should not list \"workato\" as a provider",
+      "suggested_fix": "Remove the \"workato\" entry from the config array — it is added automatically at runtime.",
       "scope": "recipe",
       "assert": { "builtin": "check_config_no_workato" }
     },
@@ -215,6 +239,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Step provider not found in config",
+      "suggested_fix": "Add the step's provider to the recipe config array, or correct the provider name in the step.",
       "scope": "recipe",
       "assert": { "builtin": "check_config_provider_match" }
     },
@@ -223,6 +248,7 @@
       "tier": 1,
       "level": "error",
       "message": "Action name is not valid for its provider",
+      "suggested_fix": "Update the action \"name\" field to a valid action name for this connector (see the connector's lint-rules.json).",
       "scope": "recipe",
       "assert": { "builtin": "check_action_name_valid" }
     },
@@ -231,6 +257,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Connector action rule violation",
+      "suggested_fix": "Check the connector's lint-rules.json for required fields and fix the violation.",
       "scope": "recipe",
       "assert": { "builtin": "check_action_rules" }
     },
@@ -240,6 +267,7 @@
       "tier": 1,
       "level": "error",
       "message": "Datapill payload is not valid JSON",
+      "suggested_fix": "Fix the datapill payload so it is valid JSON — check for unbalanced braces or missing quotes.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -248,6 +276,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Condition input should be a datapill, not a formula expression",
+      "suggested_fix": "Move the formula to the right-hand side of the condition; the left side should be a plain datapill.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -256,6 +285,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Single datapill in formula mode — use interpolation mode instead",
+      "suggested_fix": "Switch from formula mode to interpolation mode for single datapill references.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -264,6 +294,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Multiple datapills using interpolation — consider formula mode",
+      "suggested_fix": "Use formula mode with .concat() or + instead of multiple interpolated datapills.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -272,6 +303,7 @@
       "tier": 1,
       "level": "info",
       "message": "Formula wrapped in unnecessary outer parentheses",
+      "suggested_fix": "Remove the unnecessary outer parentheses wrapping the formula expression.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -280,6 +312,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Datapill path contains \"body\" but step provider is not an API platform connector",
+      "suggested_fix": "Remove \"body\" from the datapill path — only API platform connectors use body-prefixed paths.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -288,6 +321,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Datapill references catch alias with null provider",
+      "suggested_fix": "Verify the catch step alias and provider are correct for this datapill reference.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },
@@ -297,6 +331,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Input field not found in extended_input_schema",
+      "suggested_fix": "Add the missing field to extended_input_schema, or remove it from the step's input.",
       "scope": "recipe",
       "assert": { "builtin": "check_eis" }
     },
@@ -305,6 +340,7 @@
       "tier": 1,
       "level": "warn",
       "message": "EIS field not found in input",
+      "suggested_fix": "Remove the extra EIS field, or add a corresponding entry in the step's input.",
       "scope": "recipe",
       "assert": { "builtin": "check_eis" }
     },
@@ -313,6 +349,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Input field is a nested object but EIS field lacks properties",
+      "suggested_fix": "Add \"properties\" to the EIS field definition to describe the nested object structure.",
       "scope": "recipe",
       "assert": { "builtin": "check_eis" }
     },
@@ -321,6 +358,7 @@
       "tier": 1,
       "level": "warn",
       "message": "EIS field is a connector-internal field",
+      "suggested_fix": "Remove the connector-internal field from extended_input_schema — it is managed by the connector.",
       "scope": "recipe",
       "assert": { "builtin": "check_eis" }
     },
@@ -329,6 +367,7 @@
       "tier": 1,
       "level": "info",
       "message": "EIS field not found in extended_output_schema for return_result action",
+      "suggested_fix": "Add the field to extended_output_schema for return_result actions.",
       "scope": "recipe",
       "assert": { "builtin": "check_eis" }
     },
@@ -338,6 +377,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Unknown formula method not in Workato formula allowlist",
+      "suggested_fix": "Check the Workato formula reference for valid method names, or correct the spelling.",
       "scope": "recipe",
       "assert": { "builtin": "check_formulas" }
     },
@@ -346,6 +386,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Formula contains a forbidden pattern",
+      "suggested_fix": "Replace the forbidden formula pattern with an approved alternative.",
       "scope": "recipe",
       "assert": { "builtin": "check_formulas" }
     },
@@ -355,6 +396,7 @@
       "tier": 2,
       "level": "error",
       "message": "Catch block must be the last child in its try block",
+      "suggested_fix": "Move the catch block to the last position within the try block.",
       "scope": "recipe",
       "assert": { "builtin": "check_catch_last_in_try" }
     },
@@ -363,6 +405,7 @@
       "tier": 2,
       "level": "error",
       "message": "Else block must be the last child in its if block",
+      "suggested_fix": "Move the else block to the last position within the if block.",
       "scope": "recipe",
       "assert": { "builtin": "check_else_last_in_if" }
     },
@@ -371,6 +414,7 @@
       "tier": 2,
       "level": "warn",
       "message": "Success response is inside catch block — should be in try body",
+      "suggested_fix": "Move the success return_response into the try body, before the catch block.",
       "scope": "recipe",
       "assert": { "builtin": "check_success_before_catch" }
     },
@@ -379,6 +423,7 @@
       "tier": 2,
       "level": "warn",
       "message": "Declared response code has no corresponding return_response",
+      "suggested_fix": "Add a return_response step for each declared response code.",
       "scope": "recipe",
       "assert": { "builtin": "check_terminal_coverage" }
     },
@@ -387,6 +432,7 @@
       "tier": 2,
       "level": "warn",
       "message": "Control flow path does not terminate with return_response/return_result",
+      "suggested_fix": "Add a return_response or return_result step to the unterminated code path.",
       "scope": "recipe",
       "assert": { "builtin": "check_all_paths_return" }
     },
@@ -395,6 +441,7 @@
       "tier": 2,
       "level": "warn",
       "message": "Catch return_response missing required response body field",
+      "suggested_fix": "Ensure the catch block's return_response includes all required response body fields.",
       "scope": "recipe",
       "assert": { "builtin": "check_catch_returns_all_fields" }
     },
@@ -403,6 +450,7 @@
       "tier": 2,
       "level": "warn",
       "message": "Recipe call is missing input.flow_id.zip_name",
+      "suggested_fix": "Add \"zip_name\" to the recipe call's input.flow_id to reference the callable recipe.",
       "scope": "recipe",
       "assert": { "builtin": "check_recipe_call_zip_name" }
     },
@@ -412,6 +460,7 @@
       "tier": 3,
       "level": "warn",
       "message": "Datapill references step which does not match any step alias",
+      "suggested_fix": "Check that the datapill's step reference matches an actual step's \"as\" field.",
       "scope": "recipe",
       "assert": { "builtin": "check_dataflow" }
     },
@@ -420,6 +469,7 @@
       "tier": 3,
       "level": "warn",
       "message": "Datapill provider does not match resolved step provider",
+      "suggested_fix": "Update the datapill's provider to match the referenced step's provider.",
       "scope": "recipe",
       "assert": { "builtin": "check_dataflow" }
     },
@@ -428,6 +478,7 @@
       "tier": 3,
       "level": "warn",
       "message": "Datapill references step not reachable from current step",
+      "suggested_fix": "Move the datapill reference to a step that executes after the referenced step, or use a different data source.",
       "scope": "recipe",
       "assert": { "builtin": "check_dataflow" }
     },
@@ -436,6 +487,7 @@
       "tier": 3,
       "level": "info",
       "message": "API endpoint datapill path should start with \"request\"",
+      "suggested_fix": "Start the datapill path with \"request\" for API endpoint triggers.",
       "scope": "recipe",
       "assert": { "builtin": "check_dataflow" }
     }
