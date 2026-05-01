@@ -50,6 +50,9 @@ func evalBuiltinRule(ctx *BuiltinContext, rule CustomRule) []LintDiagnostic {
 		if rawDiags[i].Level == "" {
 			rawDiags[i].Level = rule.Level
 		}
+		if rawDiags[i].SuggestedFix == "" {
+			rawDiags[i].SuggestedFix = rule.SuggestedFix
+		}
 		rawDiags[i].Tier = rule.Tier
 	}
 	return rawDiags
@@ -58,10 +61,11 @@ func evalBuiltinRule(ctx *BuiltinContext, rule CustomRule) []LintDiagnostic {
 func evalRecipeScope(parsed *recipe.ParsedRecipe, rule CustomRule) []LintDiagnostic {
 	if !evalAssertion(nil, parsed, rule.Assert) {
 		return []LintDiagnostic{{
-			Level:   rule.Level,
-			Message: rule.Message,
-			RuleID:  rule.RuleID,
-			Tier:    rule.Tier,
+			Level:        rule.Level,
+			Message:      rule.Message,
+			RuleID:       rule.RuleID,
+			Tier:         rule.Tier,
+			SuggestedFix: rule.SuggestedFix,
 		}}
 	}
 	return nil
@@ -76,11 +80,12 @@ func evalStepScope(parsed *recipe.ParsedRecipe, rule CustomRule) []LintDiagnosti
 		}
 		if !evalAssertion(step, parsed, rule.Assert) {
 			diags = append(diags, LintDiagnostic{
-				Level:   rule.Level,
-				Message: rule.Message,
-				Source:  &SourceRef{JSONPointer: step.JSONPointer},
-				RuleID:  rule.RuleID,
-				Tier:    rule.Tier,
+				Level:        rule.Level,
+				Message:      rule.Message,
+				Source:       &SourceRef{JSONPointer: step.JSONPointer},
+				RuleID:       rule.RuleID,
+				Tier:         rule.Tier,
+				SuggestedFix: rule.SuggestedFix,
 			})
 		}
 	}

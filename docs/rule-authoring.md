@@ -107,22 +107,34 @@ Rules not listed in a profile use their hardcoded default severity (shown in the
 
 Extends `standard`. Escalates key validation rules to errors, suitable for recipes headed to production.
 
-| Rule ID | Escalated to |
-|---------|-------------|
-| `ACTION_NAME_VALID` | error |
-| `FORMULA_METHOD_INVALID` | error |
-| `FORMULA_FORBIDDEN_PATTERN` | error |
-| `DP_VALID_JSON` | error |
-| `DP_LHS_NO_FORMULA` | error |
-| `EIS_MIRRORS_INPUT` | error |
-| `EIS_NAME_MATCH` | error |
-| `ALL_PATHS_RETURN` | error |
-| `TERMINAL_COVERAGE` | error |
-| `CATCH_RETURNS_ALL_FIELDS` | error |
-| `RECIPE_CALL_ZIP_NAME` | error |
-| `DP_LINE_RESOLVES` | error |
-| `DP_PROVIDER_MATCHES` | error |
-| `DP_STEP_REACHABLE` | error |
+#### Profile comparison
+
+Rules where `standard` and `strict` differ are shown below. Rules not listed are identical in both profiles.
+
+| Rule ID | Tier | `standard` | `strict` |
+|---------|------|-----------|----------|
+| `ACTION_NAME_VALID` | 1 | warn | **error** |
+| `RESPONSE_CODES_DEFINED` | 1 | info | **warn** |
+| `IF_NO_PROVIDER` | 1 | warn | **error** |
+| `ELSE_NO_PROVIDER` | 1 | warn | **error** |
+| `CATCH_PROVIDER_NULL` | 1 | warn | **error** |
+| `CATCH_HAS_AS` | 1 | warn | **error** |
+| `TRY_NO_AS` | 1 | warn | **error** |
+| `CATCH_HAS_RETRY` | 1 | info | **warn** |
+| `CONFIG_NO_WORKATO` | 1 | warn | **error** |
+| `CONFIG_PROVIDER_MATCH` | 1 | warn | **error** |
+| `FORMULA_METHOD_INVALID` | 1 | warn | **error** |
+| `FORMULA_FORBIDDEN_PATTERN` | 1 | warn | **error** |
+| `DP_LHS_NO_FORMULA` | 1 | warn | **error** |
+| `EIS_MIRRORS_INPUT` | 1 | warn | **error** |
+| `EIS_NAME_MATCH` | 1 | warn | **error** |
+| `TERMINAL_COVERAGE` | 2 | warn | **error** |
+| `ALL_PATHS_RETURN` | 2 | warn | **error** |
+| `CATCH_RETURNS_ALL_FIELDS` | 2 | warn | **error** |
+| `RECIPE_CALL_ZIP_NAME` | 2 | warn | **error** |
+| `DP_LINE_RESOLVES` | 3 | warn | **error** |
+| `DP_PROVIDER_MATCHES` | 3 | warn | **error** |
+| `DP_STEP_REACHABLE` | 3 | warn | **error** |
 
 ### Custom Profiles
 
@@ -451,6 +463,17 @@ The linter discovers rules from two paths:
 
 Both paths are optional. Without them, only built-in rules run.
 
+### Getting Started with a Template
+
+Copy the example template to your project and customize it:
+
+```bash
+mkdir -p .wklint/rules
+cp docs/examples/custom-rule-template.json .wklint/rules/my-rules.json
+```
+
+The template includes examples of the most common patterns: required fields, UUID naming, step count limits, and combined assertions. Delete the examples you don't need and adjust the rest.
+
 ### Testing Custom Rules Against a Recipe Corpus
 
 You can validate your custom rules against a directory of real recipes by running the linter over the whole corpus:
@@ -462,3 +485,45 @@ wk lint ./recipes/ --skills-path ./skills/ --config-path .wklintrc.json
 This runs all four tiers — including your custom rules — on every recipe in the directory and reports diagnostics per file. Files that aren't valid recipes are skipped gracefully.
 
 Without `--skills-path` or `--config-path`, only built-in rules run.
+
+---
+
+## Troubleshooting
+
+### My custom rule isn't firing
+
+1. **Check the file is discovered.** Project rules must be in `.wklint/rules/*.json` and must have a `.json` extension. Connector rules must be named exactly `lint-rules.json`.
+
+2. **Check the version field.** Declarative rules require `"version": "0.2.0"`. If the version is `"0.1.0"`, only the `action_rules` / connector data format is read — the `rules` array is ignored.
+
+3. **Check the scope.** A `"scope": "recipe"` rule runs once per recipe. A `"scope": "step"` rule runs per step. If your `where` clause filters too aggressively (wrong keyword, provider, or action_name), no steps will match.
+
+4. **Check the tier.** If you run `wk lint --tiers 0,1` but your rule is `"tier": 2`, it won't execute. The default (no `--tiers` flag) runs all four tiers.
+
+5. **Check for load warnings.** If your rule has a typo in the assertion key (e.g., `feild_exists` instead of `field_exists`), the linter emits a `CUSTOM_RULE_INVALID` warning and skips the rule. Look for these warnings in the output.
+
+6. **Check the field path.** Paths use dot notation and are case-sensitive. `input.Sobject_Name` won't match `input.sobject_name`. Use the [Field Paths](#field-paths) reference to verify the path prefix is valid.
+
+### My rule fires when it shouldn't
+
+1. **Check the `where` clause.** Without a `where` clause, a step-scoped rule runs on *every* step. Add `"where": { "keyword": "action" }` to limit it.
+
+2. **Check `field_absent` vs `field_exists`.** These are easy to swap — `field_absent` passes when the field is *missing*, `field_exists` passes when it's *present*. The assertion must be true for the rule to *pass* (no diagnostic).
+
+3. **Check assertion logic.** The `assert` block must be true for the rule to pass. If you want "field X must exist", use `field_exists`. If you want "field X must not exist", use `field_absent`.
+
+### My regex pattern isn't matching
+
+1. **Invalid regex patterns are caught at load time.** If your pattern has a syntax error, the rule will be rejected with a `CUSTOM_RULE_INVALID` warning.
+
+2. **Regex uses Go syntax** (RE2). Features like lookahead (`(?=...)`) and backreferences (`\1`) are not supported. See the [RE2 syntax reference](https://github.com/google/re2/wiki/Syntax).
+
+3. **Patterns are not anchored by default.** `"pattern": "sf-"` matches anywhere in the string. Use `"pattern": "^sf-"` to anchor to the start.
+
+### My severity override isn't working
+
+1. **Check the rule ID spelling.** Rule IDs in `.wklintrc.json` must match exactly (case-sensitive). A typo like `"UUID_DECRIPTIVE"` won't match `UUID_DESCRIPTIVE` — and there's no warning for unrecognized IDs.
+
+2. **Check the override chain.** Profile overrides apply first, then `.wklintrc.json` overrides. If you set a rule to `"off"` in the profile but `"error"` in `.wklintrc.json`, it will be an error (config wins).
+
+3. **Check the profile name.** If `--profile` or the config `"profile"` field has a typo, profile resolution fails and no profile layer is applied.

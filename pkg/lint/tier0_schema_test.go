@@ -297,3 +297,38 @@ func TestTier0_MultipleStepsMissingUUID(t *testing.T) {
 		t.Errorf("expected 2 STEP_MISSING_UUID diagnostics, got %d", count)
 	}
 }
+
+func TestTier0_SuggestedFix_BackfilledViaLintRecipe(t *testing.T) {
+	diags, err := LintRecipe([]byte(`{{{`), LintOptions{Tiers: []int{0}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasDiag(diags, "INVALID_JSON") {
+		t.Fatal("expected INVALID_JSON diagnostic")
+	}
+	for _, d := range diags {
+		if d.RuleID == "INVALID_JSON" {
+			if d.SuggestedFix == "" {
+				t.Error("INVALID_JSON diagnostic missing suggested_fix after backfill")
+			}
+			return
+		}
+	}
+}
+
+func TestTier0_SuggestedFix_BackfilledForMissingKeys(t *testing.T) {
+	data := toJSON(t, map[string]interface{}{"name": "test"})
+	diags, err := LintRecipe(data, LintOptions{Tiers: []int{0}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range diags {
+		if d.RuleID == "MISSING_TOP_LEVEL_KEYS" {
+			if d.SuggestedFix == "" {
+				t.Error("MISSING_TOP_LEVEL_KEYS diagnostic missing suggested_fix after backfill")
+			}
+			return
+		}
+	}
+	t.Fatal("expected MISSING_TOP_LEVEL_KEYS diagnostic")
+}
