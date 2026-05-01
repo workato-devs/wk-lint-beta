@@ -242,6 +242,95 @@ func TestLintVersion(t *testing.T) {
 	}
 }
 
+func TestDescribeRules(t *testing.T) {
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      float64(97),
+		Method:  "lint.describe_rules",
+	}
+	resp := handleRequest(req)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
+	}
+
+	resultBytes, _ := json.Marshal(resp.Result)
+	var result struct {
+		Rules []struct {
+			RuleID       string `json:"rule_id"`
+			Tier         int    `json:"tier"`
+			DefaultLevel string `json:"default_level"`
+			Message      string `json:"message"`
+			SuggestedFix string `json:"suggested_fix"`
+			Scope        string `json:"scope"`
+			Source       string `json:"source"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		t.Fatalf("cannot unmarshal result: %v", err)
+	}
+
+	if len(result.Rules) < 50 {
+		t.Errorf("expected at least 50 builtin rules, got %d", len(result.Rules))
+	}
+
+	// Verify a known rule has all fields populated
+	found := false
+	for _, r := range result.Rules {
+		if r.RuleID == "UUID_UNIQUE" {
+			found = true
+			if r.Tier != 1 {
+				t.Errorf("UUID_UNIQUE: expected tier 1, got %d", r.Tier)
+			}
+			if r.DefaultLevel != "error" {
+				t.Errorf("UUID_UNIQUE: expected default_level error, got %s", r.DefaultLevel)
+			}
+			if r.Source != "builtin" {
+				t.Errorf("UUID_UNIQUE: expected source builtin, got %s", r.Source)
+			}
+			if r.SuggestedFix == "" {
+				t.Error("UUID_UNIQUE: expected non-empty suggested_fix")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("UUID_UNIQUE not found in rule catalog")
+	}
+}
+
+func TestDescribeRulesWithParams(t *testing.T) {
+	params, _ := json.Marshal(describeRulesParams{
+		SkillsPath: "/nonexistent/path",
+	})
+	req := RPCRequest{
+		JSONRPC: "2.0",
+		ID:      float64(96),
+		Method:  "lint.describe_rules",
+		Params:  json.RawMessage(params),
+	}
+	resp := handleRequest(req)
+
+	if resp.Error != nil {
+		t.Fatalf("unexpected error: code=%d message=%s", resp.Error.Code, resp.Error.Message)
+	}
+
+	resultBytes, _ := json.Marshal(resp.Result)
+	var result struct {
+		Rules []struct {
+			RuleID string `json:"rule_id"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		t.Fatalf("cannot unmarshal result: %v", err)
+	}
+
+	// Should still return builtin rules even with nonexistent skills path
+	if len(result.Rules) < 50 {
+		t.Errorf("expected at least 50 builtin rules, got %d", len(result.Rules))
+	}
+}
+
 func TestShutdown(t *testing.T) {
 	req := RPCRequest{
 		JSONRPC: "2.0",
