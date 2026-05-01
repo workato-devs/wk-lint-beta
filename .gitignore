@@ -26,6 +26,7 @@ Thumbs.db
 .windsurf/
 .windsurfrules
 .aider*
+Claude.md
 
 # Test & dev artifacts
 *.test

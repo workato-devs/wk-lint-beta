@@ -98,7 +98,13 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		return diags, err
 	}
 
-	// 7b. Load custom rules from skills + project .wklint/rules/
+	// 7b. Load built-in rules (embedded JSON)
+	builtinRules, err := loadBuiltinRules()
+	if err != nil {
+		return diags, err
+	}
+
+	// 7c. Load custom rules from skills + project .wklint/rules/
 	projectRoot := ""
 	if opts.ConfigPath != "" {
 		projectRoot = filepath.Dir(opts.ConfigPath)
@@ -113,22 +119,29 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 		customRules = append(customRules, cr.Rules...)
 	}
 
-	// 7c. Run Tier 0 custom rules (requires parsed recipe, so runs after parsing)
+	// Prepend built-in rules so they can be overridden by user rules
+	customRules = append(builtinRules, customRules...)
+
+	// Build context for rule evaluation
+	ctx := &BuiltinContext{
+		Parsed:    parsed,
+		ConnRules: connRules,
+		Filename:  opts.Filename,
+	}
+
+	// 7d. Run Tier 0 custom rules (requires parsed recipe, so runs after parsing)
 	if tierSet[0] {
-		diags = append(diags, evalCustomRules(parsed, customRules, 0, nil)...)
+		diags = append(diags, evalCustomRules(ctx, customRules, 0)...)
 	}
 
 	// 8. Run Tier 1 if requested
 	if tierSet[1] {
-		diags = append(diags, lintTier1Steps(parsed, opts.Filename, connRules)...)
-		diags = append(diags, evalCustomRules(parsed, customRules, 1, nil)...)
+		diags = append(diags, evalCustomRules(ctx, customRules, 1)...)
 	}
 
 	// 9. Build IGM graph for Tier 2-3 if needed
-	var graph *igm.Graph
 	if tierSet[2] || tierSet[3] {
-		var igmErr error
-		graph, igmErr = igm.Transform(data)
+		graph, igmErr := igm.Transform(data)
 		if igmErr != nil {
 			diags = append(diags, LintDiagnostic{
 				Level:   LevelWarn,
@@ -137,18 +150,19 @@ func LintRecipe(data []byte, opts LintOptions) ([]LintDiagnostic, error) {
 				Tier:    2,
 			})
 		}
+		if graph != nil {
+			ctx.Graph = graph
+		}
 	}
 
 	// 10. Run Tier 2 if requested
-	if tierSet[2] && graph != nil {
-		diags = append(diags, lintTier2Structure(graph, parsed)...)
-		diags = append(diags, evalCustomRules(parsed, customRules, 2, graph)...)
+	if tierSet[2] && ctx.Graph != nil {
+		diags = append(diags, evalCustomRules(ctx, customRules, 2)...)
 	}
 
 	// 11. Run Tier 3 if requested
-	if tierSet[3] && graph != nil {
-		diags = append(diags, lintTier3DataFlow(parsed, graph)...)
-		diags = append(diags, evalCustomRules(parsed, customRules, 3, graph)...)
+	if tierSet[3] && ctx.Graph != nil {
+		diags = append(diags, evalCustomRules(ctx, customRules, 3)...)
 	}
 
 	// 12. Apply overrides (profile first, then config)

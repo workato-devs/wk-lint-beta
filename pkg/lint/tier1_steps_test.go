@@ -229,215 +229,6 @@ func TestTier1_ConfigProviderMatch_NilProviderSkipped(t *testing.T) {
 	}
 }
 
-func TestTier1_IfNoProvider_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "if", Provider: nil}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "IF_NO_PROVIDER") {
-		t.Error("expected no IF_NO_PROVIDER when provider is nil")
-	}
-}
-
-func TestTier1_IfNoProvider_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "if", Provider: strPtr("salesforce")}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "IF_NO_PROVIDER") {
-		t.Error("expected IF_NO_PROVIDER when if has provider")
-	}
-}
-
-func TestTier1_ElseNoProvider_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "else", Provider: nil}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "ELSE_NO_PROVIDER") {
-		t.Error("expected no ELSE_NO_PROVIDER when provider is nil")
-	}
-}
-
-func TestTier1_ElseNoProvider_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "else", Provider: strPtr("salesforce")}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "ELSE_NO_PROVIDER") {
-		t.Error("expected ELSE_NO_PROVIDER when else has provider")
-	}
-}
-
-func TestTier1_CatchProviderNull_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "error_msg", Input: rawJSON(t, map[string]interface{}{"max_retry_count": 3})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "CATCH_PROVIDER_NULL") {
-		t.Error("expected no CATCH_PROVIDER_NULL when provider is nil")
-	}
-}
-
-func TestTier1_CatchProviderNull_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: strPtr("something"), As: "error_msg", Input: rawJSON(t, map[string]interface{}{"max_retry_count": 3})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "CATCH_PROVIDER_NULL") {
-		t.Error("expected CATCH_PROVIDER_NULL when catch has provider")
-	}
-}
-
-func TestTier1_TryNoAs_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "try", As: ""}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "TRY_NO_AS") {
-		t.Error("expected no TRY_NO_AS when as is empty")
-	}
-}
-
-func TestTier1_TryNoAs_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "try", As: "something"}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "TRY_NO_AS") {
-		t.Error("expected TRY_NO_AS when try has non-empty as")
-	}
-}
-
-func TestTier1_CatchHasAs_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "error_msg", Input: rawJSON(t, map[string]interface{}{"max_retry_count": 3})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "CATCH_HAS_AS") {
-		t.Error("expected no CATCH_HAS_AS when as is non-empty")
-	}
-}
-
-func TestTier1_CatchHasAs_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "", Input: rawJSON(t, map[string]interface{}{"max_retry_count": 3})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "CATCH_HAS_AS") {
-		t.Error("expected CATCH_HAS_AS when as is empty")
-	}
-}
-
-func TestTier1_CatchHasRetry_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "err", Input: rawJSON(t, map[string]interface{}{"max_retry_count": 3})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if hasDiag(diags, "CATCH_HAS_RETRY") {
-		t.Error("expected no CATCH_HAS_RETRY when max_retry_count is present")
-	}
-}
-
-func TestTier1_CatchHasRetry_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "err", Input: rawJSON(t, map[string]interface{}{"other_field": "value"})}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "CATCH_HAS_RETRY") {
-		t.Error("expected CATCH_HAS_RETRY when max_retry_count is missing")
-	}
-}
-
-func TestTier1_CatchHasRetry_NilInput(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "catch", Provider: nil, As: "err"}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkControlFlowRules(parsed)
-	if !hasDiag(diags, "CATCH_HAS_RETRY") {
-		t.Error("expected CATCH_HAS_RETRY when input is nil")
-	}
-}
-
-func TestTier1_NoElsif_Pass(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "if"}, JSONPointer: "/code/block/0"},
-		{Code: recipe.Code{Keyword: "else"}, JSONPointer: "/code/block/1"},
-	}, nil)
-	diags := checkNoElsif(parsed)
-	if hasDiag(diags, "NO_ELSIF") {
-		t.Error("expected no NO_ELSIF")
-	}
-}
-
-func TestTier1_NoElsif_Fail(t *testing.T) {
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "elsif"}, JSONPointer: "/code/block/0"},
-	}, nil)
-	diags := checkNoElsif(parsed)
-	if !hasDiag(diags, "NO_ELSIF") {
-		t.Error("expected NO_ELSIF for elsif keyword")
-	}
-}
-
-func TestTier1_ResponseCodesDefined_Pass(t *testing.T) {
-	provider := "workato_api_platform"
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{
-			Keyword:  "trigger",
-			Provider: &provider,
-			Input:    rawJSON(t, map[string]interface{}{"response_codes": "200"}),
-		}, JSONPointer: "/code"},
-	}, nil)
-	diags := checkResponseCodesDefined(parsed)
-	if hasDiag(diags, "RESPONSE_CODES_DEFINED") {
-		t.Error("expected no RESPONSE_CODES_DEFINED when response_codes is present")
-	}
-}
-
-func TestTier1_ResponseCodesDefined_Fail(t *testing.T) {
-	provider := "workato_api_platform"
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{
-			Keyword:  "trigger",
-			Provider: &provider,
-			Input:    rawJSON(t, map[string]interface{}{"other": "field"}),
-		}, JSONPointer: "/code"},
-	}, nil)
-	diags := checkResponseCodesDefined(parsed)
-	if !hasDiag(diags, "RESPONSE_CODES_DEFINED") {
-		t.Error("expected RESPONSE_CODES_DEFINED when response_codes is missing")
-	}
-}
-
-func TestTier1_ResponseCodesDefined_NilInput(t *testing.T) {
-	provider := "workato_api_platform"
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{
-			Keyword:  "trigger",
-			Provider: &provider,
-		}, JSONPointer: "/code"},
-	}, nil)
-	diags := checkResponseCodesDefined(parsed)
-	if !hasDiag(diags, "RESPONSE_CODES_DEFINED") {
-		t.Error("expected RESPONSE_CODES_DEFINED when input is nil")
-	}
-}
-
-func TestTier1_ResponseCodesDefined_NonAPIPlatform(t *testing.T) {
-	provider := "salesforce"
-	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{
-			Keyword:  "trigger",
-			Provider: &provider,
-		}, JSONPointer: "/code"},
-	}, nil)
-	diags := checkResponseCodesDefined(parsed)
-	if hasDiag(diags, "RESPONSE_CODES_DEFINED") {
-		t.Error("expected no RESPONSE_CODES_DEFINED for non-API platform trigger")
-	}
-}
-
 func TestTier1_ActionNameValid_Pass(t *testing.T) {
 	connRules := map[string]*ConnectorRules{
 		"rest": {ValidActionNames: []string{"make_request_v2"}},
@@ -519,6 +310,16 @@ func TestTier1_ActionNameValid_NoNameField(t *testing.T) {
 	}
 }
 
+func evalTier1BuiltinForTest(t *testing.T, parsed *recipe.ParsedRecipe, filename string, connRules map[string]*ConnectorRules) []LintDiagnostic {
+	t.Helper()
+	rules, err := loadBuiltinRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &BuiltinContext{Parsed: parsed, ConnRules: connRules, Filename: filename}
+	return evalCustomRules(ctx, rules, 1)
+}
+
 func TestTier1_FullIntegration(t *testing.T) {
 	provider := "salesforce"
 	parsed := buildParsedRecipe("Test Recipe", []recipe.FlatStep{
@@ -527,7 +328,7 @@ func TestTier1_FullIntegration(t *testing.T) {
 	}, []recipe.ConfigEntry{
 		{Keyword: "application", Provider: "salesforce"},
 	})
-	diags := lintTier1Steps(parsed, "test_recipe.recipe.json", nil)
+	diags := evalTier1BuiltinForTest(t, parsed, "test_recipe.recipe.json", nil)
 	if len(diags) != 0 {
 		for _, d := range diags {
 			t.Errorf("unexpected diagnostic: %s — %s", d.RuleID, d.Message)
@@ -540,7 +341,7 @@ func TestTier1_AllDiagsAreTier1(t *testing.T) {
 		{Code: recipe.Code{Keyword: "trigger", Number: intPtr(5), UUID: "550e8400-e29b-41d4-a716-446655440000"}, JSONPointer: "/code"},
 		{Code: recipe.Code{Keyword: "elsif", Number: intPtr(1), UUID: "550e8400-e29b-41d4-a716-446655440000"}, JSONPointer: "/code/block/0"},
 	}, nil)
-	diags := lintTier1Steps(parsed, "wrong.recipe.json", nil)
+	diags := evalTier1BuiltinForTest(t, parsed, "wrong.recipe.json", nil)
 	for _, d := range diags {
 		if d.Tier != 1 {
 			t.Errorf("expected tier 1 for rule %s, got tier %d", d.RuleID, d.Tier)

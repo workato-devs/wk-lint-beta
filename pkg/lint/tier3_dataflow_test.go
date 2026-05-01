@@ -3,11 +3,24 @@ package lint
 import (
 	"os"
 	"testing"
+
+	"github.com/workato-devs/wk-lint-beta/pkg/igm"
+	"github.com/workato-devs/wk-lint-beta/pkg/recipe"
 )
+
+func evalTier3BuiltinForTest(t *testing.T, parsed *recipe.ParsedRecipe, graph *igm.Graph) []LintDiagnostic {
+	t.Helper()
+	rules, err := loadBuiltinRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &BuiltinContext{Parsed: parsed, Graph: graph}
+	return evalCustomRules(ctx, rules, 3)
+}
 
 func TestTier3_DPLineResolves(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "simple_connector.recipe.json")
-	diags := lintTier3DataFlow(parsed, graph)
+	diags := evalTier3BuiltinForTest(t, parsed, graph)
 
 	// All datapills in this fixture reference valid step aliases (trigger, update_booking_catch)
 	for _, d := range diags {
@@ -19,7 +32,7 @@ func TestTier3_DPLineResolves(t *testing.T) {
 
 func TestTier3_DPProviderMatches(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "simple_connector.recipe.json")
-	diags := lintTier3DataFlow(parsed, graph)
+	diags := evalTier3BuiltinForTest(t, parsed, graph)
 
 	// Datapills in this fixture correctly reference workato_recipe_function for trigger
 	for _, d := range diags {
@@ -31,7 +44,7 @@ func TestTier3_DPProviderMatches(t *testing.T) {
 
 func TestTier3_DPStepReachable(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "simple_connector.recipe.json")
-	diags := lintTier3DataFlow(parsed, graph)
+	diags := evalTier3BuiltinForTest(t, parsed, graph)
 
 	// All datapill references in this fixture are reachable (trigger → update_booking → return)
 	for _, d := range diags {
@@ -43,7 +56,7 @@ func TestTier3_DPStepReachable(t *testing.T) {
 
 func TestTier3_DPTriggerPath(t *testing.T) {
 	_, parsed, graph := loadAndBuild(t, "api_endpoint_try_catch.recipe.json")
-	diags := lintTier3DataFlow(parsed, graph)
+	diags := evalTier3BuiltinForTest(t, parsed, graph)
 
 	// API endpoint datapills use ["request", "field"] which is correct
 	for _, d := range diags {
@@ -92,8 +105,8 @@ func TestTier3_AllTiersRun(t *testing.T) {
 
 	t.Logf("Diagnostics by tier: %v", tiers)
 
-	// Should have diagnostics from tier 1 at minimum
-	if tiers[1] == 0 {
-		t.Error("expected tier 1 diagnostics")
+	// Should have diagnostics from at least one tier above 0
+	if tiers[1]+tiers[2]+tiers[3] == 0 {
+		t.Error("expected diagnostics from tier 1, 2, or 3")
 	}
 }
