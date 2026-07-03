@@ -411,7 +411,7 @@
       "tier": 1,
       "level": "warn",
       "message": "return_response blocks do not share an identical schema",
-      "suggested_fix": "Ensure every return_response block in the recipe declares an identical extended_input_schema and extended_output_schema.",
+      "suggested_fix": "Ensure every return_response block in the recipe declares an identical extended_input_schema and extended_output_schema, and set \"optional\": true on any response field not populated by every block — the platform treats non-optional declared fields as required per block and blocks activation (success:false, \"can't be blank\") otherwise.",
       "scope": "recipe",
       "assert": { "builtin": "check_return_response_schema" }
     },
