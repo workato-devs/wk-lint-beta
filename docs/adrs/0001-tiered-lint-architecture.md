@@ -1,6 +1,7 @@
 # Recipe Linter: Tiered Validation for Workato Recipe JSON
 
 **Author(s):** Zayne Turner, Claude [role: assistant; harness: Claude Code]
+**Amended-by:** Codex [role: assistant; harness: Codex; model: GPT-5], dir. Zayne Turner — July 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code; model: Opus 4.8], dir. Zayne Turner — June 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code], dir. Zayne Turner — March 2026
 **Status:** Accepted
@@ -8,6 +9,7 @@
 **Implemented:** March 20, 2026 (IGM port + Tiers 2-3)
 
 **Amendments:**
+- July 21, 2026 — Optional plugin-owned text renderer added; structured lint results remain canonical
 - June 16, 2026 — Linter split into standalone `recipe-lint` repo; "Where Things Live" layout corrected
 - June 12, 2026 — Tier-2 structure/flow split; recipe tree-ancestry layer
 - March 20, 2026 — IGM port + Tiers 2-3 implemented
@@ -74,6 +76,16 @@ method = "lint.run"
 [hooks]
 pre-push = "lint.pre_push"
 ```
+
+> **Amendment (July 2026): human-readable output is delegated to an optional plugin-owned renderer.**
+> The original manifest above exposed only the canonical `lint.run` method and left all formatting
+> to `wk`. Generic host formatting could not present nested diagnostics without leaking Go
+> `map[...]` syntax, so the lint command now also declares `renderer = "lint.render"`. In text
+> mode, compatible `wk` hosts pass the already-computed `lint.run` result to that method with
+> rendering context; the method returns `{ "text": "..." }`. It is a pure presentation step: it
+> does not rerun lint, mutate the primary result, or determine the process exit code. `--json`
+> still emits the canonical `lint.run` result without invoking the renderer, and older hosts may
+> ignore the additive manifest field safely.
 
 ### Process overhead
 

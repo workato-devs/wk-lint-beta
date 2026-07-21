@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Plugin-owned text rendering (#26): `lint.render` turns an existing `lint.run`
+  result into stable, human-readable per-file diagnostics and summaries. Compatible
+  `wk` hosts call it only for text output; `--json` continues to emit the canonical
+  `lint.run` result and the renderer cannot alter the command exit code.
 - Datapill path resolution (#22): `DP_PATH_RESOLVES` (Tier 3) flags a datapill whose `path`
   points at a field not declared in the referenced step's `extended_output_schema` — the
   "made-up field" failure mode that previously passed lint and only surfaced in the Workato
