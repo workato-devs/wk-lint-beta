@@ -52,9 +52,9 @@ type lintRunParams struct {
 }
 
 type fileDiagnostics struct {
-	File        string             `json:"file"`
+	File        string                `json:"file"`
 	Diagnostics []lint.LintDiagnostic `json:"diagnostics"`
-	Summary     fileSummary        `json:"summary"`
+	Summary     fileSummary           `json:"summary"`
 }
 
 type fileSummary struct {
@@ -66,6 +66,29 @@ type fileSummary struct {
 type lintRunResult struct {
 	ExitCode int               `json:"exit_code"`
 	Files    []fileDiagnostics `json:"files"`
+}
+
+// --- lint.render types ---
+
+type lintRenderParams struct {
+	Result  json.RawMessage    `json:"result"`
+	Context *lintRenderContext `json:"context"`
+}
+
+type lintRenderContext struct {
+	Format      string `json:"format"`
+	CommandPath string `json:"command_path,omitempty"`
+}
+
+type lintRenderResult struct {
+	Text string `json:"text"`
+}
+
+// lintRenderWireResult uses pointers so a renderer request can distinguish
+// required fields that are absent from fields containing their zero values.
+type lintRenderWireResult struct {
+	ExitCode *int               `json:"exit_code"`
+	Files    *[]fileDiagnostics `json:"files"`
 }
 
 // --- lint.pre_push types ---
@@ -138,6 +161,8 @@ func handleRequest(req RPCRequest) RPCResponse {
 	switch req.Method {
 	case "lint.run":
 		return handleLintRun(req)
+	case "lint.render":
+		return handleLintRender(req)
 	case "lint.pre_push":
 		return handlePrePush(req)
 	case "lint.describe_rules":
@@ -168,6 +193,133 @@ func handleRequest(req RPCRequest) RPCResponse {
 			},
 		}
 	}
+}
+
+func handleLintRender(req RPCRequest) RPCResponse {
+	var params lintRenderParams
+	if len(req.Params) == 0 {
+		return invalidParamsResponse(req.ID, "renderer params are required")
+	}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return invalidParamsResponse(req.ID, err.Error())
+	}
+	if params.Context == nil || params.Context.Format != "text" {
+		return invalidParamsResponse(req.ID, `context.format must be "text"`)
+	}
+
+	var wire lintRenderWireResult
+	if len(params.Result) == 0 {
+		return invalidParamsResponse(req.ID, "result is required")
+	}
+	if err := json.Unmarshal(params.Result, &wire); err != nil {
+		return invalidParamsResponse(req.ID, "invalid result: "+err.Error())
+	}
+	if wire.ExitCode == nil || wire.Files == nil {
+		return invalidParamsResponse(req.ID, "result must contain exit_code and files")
+	}
+
+	result := lintRunResult{
+		ExitCode: *wire.ExitCode,
+		Files:    *wire.Files,
+	}
+
+	return RPCResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result: lintRenderResult{
+			Text: formatLintRunResult(result),
+		},
+	}
+}
+
+func invalidParamsResponse(id interface{}, message string) RPCResponse {
+	return RPCResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error: &RPCError{
+			Code:    -32602,
+			Message: "Invalid params: " + message,
+		},
+	}
+}
+
+func formatLintRunResult(result lintRunResult) string {
+	var b strings.Builder
+	total := fileSummary{}
+
+	if len(result.Files) == 0 {
+		b.WriteString("No recipe files were linted.")
+	}
+
+	for i, file := range result.Files {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+
+		filename := file.File
+		if filename == "" {
+			filename = "(unknown file)"
+		}
+		b.WriteString(filename)
+
+		if len(file.Diagnostics) == 0 {
+			b.WriteString("\n  No issues found.")
+		} else {
+			for _, diagnostic := range file.Diagnostics {
+				b.WriteString("\n  ")
+				if diagnostic.Source != nil && diagnostic.Source.JSONPointer != "" {
+					b.WriteString(diagnostic.Source.JSONPointer)
+					b.WriteByte(' ')
+				}
+				fmt.Fprintf(
+					&b,
+					"[%s] %s: %s",
+					strings.ToUpper(diagnostic.Level),
+					diagnostic.RuleID,
+					indentContinuation(diagnostic.Message, "    "),
+				)
+				if diagnostic.SuggestedFix != "" {
+					b.WriteString("\n    Suggested fix: ")
+					b.WriteString(indentContinuation(diagnostic.SuggestedFix, "    "))
+				}
+			}
+		}
+
+		fmt.Fprintf(
+			&b,
+			"\n  Summary: %s, %s, %s",
+			formatCount(file.Summary.Errors, "error"),
+			formatCount(file.Summary.Warnings, "warning"),
+			formatCount(file.Summary.Info, "info"),
+		)
+		total.Errors += file.Summary.Errors
+		total.Warnings += file.Summary.Warnings
+		total.Info += file.Summary.Info
+	}
+
+	b.WriteString("\n\nLint summary: ")
+	fmt.Fprintf(
+		&b,
+		"%s, %s, %s, %s",
+		formatCount(len(result.Files), "file"),
+		formatCount(total.Errors, "error"),
+		formatCount(total.Warnings, "warning"),
+		formatCount(total.Info, "info"),
+	)
+
+	return b.String()
+}
+
+func indentContinuation(value, indent string) string {
+	return strings.ReplaceAll(value, "\n", "\n"+indent)
+}
+
+func formatCount(count int, singular string) string {
+	label := singular
+	if count != 1 && singular != "info" {
+		label += "s"
+	}
+	return fmt.Sprintf("%d %s", count, label)
 }
 
 func handleLintRun(req RPCRequest) RPCResponse {
