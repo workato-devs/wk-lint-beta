@@ -10,6 +10,7 @@ pre-push = "lint.pre_push"
 name = "lint"
 description = "Lint Workato recipe JSON files"
 method = "lint.run"
+renderer = "lint.render"
 
 [[commands.args]]
 name = "files"
