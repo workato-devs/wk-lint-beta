@@ -397,8 +397,11 @@ Field paths use dot notation to navigate into step data:
 | `input.{field}` | Key inside the step's `input` JSON |
 | `extended_input_schema` | The step's EIS (raw) |
 | `dynamicPickListSelection.{field}` | Key inside DPS JSON |
+| `filter.{field}` | Key inside the trigger's `filter` JSON — the "only continue if..." trigger condition (`{type, operand, conditions: [...]}`). Only present on trigger steps that have one configured. |
 
-Nested paths navigate into JSON objects: `input.address.street` looks up `input` → `address` → `street`.
+Nested paths navigate into JSON objects: `input.address.street` looks up `input` → `address` → `street`. Likewise `filter.operand` looks up `"and"`/`"or"`, and `filter.conditions` resolves to the raw conditions array (no per-element indexing — see [Field Paths](#field-paths) limitations below).
+
+> **Note:** `filter` conditions' `lhs` values are also covered by the general Tier 1 datapill checks (`DP_VALID_JSON`, `DP_LHS_NO_FORMULA`, `DP_INTERPOLATION_SINGLE`, etc.) — the same checks applied to an if-block's `input.conditions[].lhs`. No separate rule authoring is needed to get that coverage.
 
 ### Connector Rules (v0.1.0)
 

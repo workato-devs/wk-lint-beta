@@ -79,13 +79,21 @@ func checkDatapillsWithCatchAliases(parsed *recipe.ParsedRecipe, connRules map[s
 
 	for i := range parsed.Steps {
 		step := &parsed.Steps[i]
-		if step.Code.Input == nil {
-			continue
+		if step.Code.Input != nil {
+			basePath := step.JSONPointer + "/input"
+			recipe.WalkStringsWithContext(step.Code.Input, basePath, func(ctx recipe.StringContext) {
+				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases)...)
+			})
 		}
-		basePath := step.JSONPointer + "/input"
-		recipe.WalkStringsWithContext(step.Code.Input, basePath, func(ctx recipe.StringContext) {
-			diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases)...)
-		})
+		// Trigger-level "only continue if..." condition (code.filter). Same
+		// {type, operand, conditions} shape as an if-block's input, but it lives
+		// outside `input` so it was previously invisible to all DP_* checks.
+		if step.Code.Filter != nil {
+			basePath := step.JSONPointer + "/filter"
+			recipe.WalkStringsWithContext(step.Code.Filter, basePath, func(ctx recipe.StringContext) {
+				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases)...)
+			})
+		}
 	}
 
 	return diags

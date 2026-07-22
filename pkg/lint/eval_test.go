@@ -88,6 +88,22 @@ func TestResolveFieldPath_NestedInput(t *testing.T) {
 	}
 }
 
+func TestResolveFieldPath_Filter(t *testing.T) {
+	step := &recipe.FlatStep{
+		Code: recipe.Code{
+			Filter: json.RawMessage(`{"type":"compound","operand":"and","conditions":[{"lhs":"#{_dp('x')}","operand":"present","rhs":"","uuid":"cond-1"}]}`),
+		},
+	}
+	val, ok := resolveFieldPath(step, "filter.operand")
+	if !ok || val != "and" {
+		t.Errorf("filter.operand = %v (ok=%v), want 'and'", val, ok)
+	}
+	val2, ok2 := resolveFieldPath(step, "filter.type")
+	if !ok2 || val2 != "compound" {
+		t.Errorf("filter.type = %v (ok=%v), want 'compound'", val2, ok2)
+	}
+}
+
 func TestResolveFieldPath_Missing(t *testing.T) {
 	step := &recipe.FlatStep{
 		Code: recipe.Code{Input: json.RawMessage(`{"a":"b"}`)},

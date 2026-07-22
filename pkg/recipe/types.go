@@ -24,6 +24,7 @@ type Code struct {
 	Input                    json.RawMessage   `json:"input,omitempty"`
 	Block                    []json.RawMessage `json:"block,omitempty"`
 	Conditions               json.RawMessage   `json:"conditions,omitempty"`
+	Filter                   json.RawMessage   `json:"filter,omitempty"`
 	ExtendedInputSchema      json.RawMessage   `json:"extended_input_schema,omitempty"`
 	ExtendedOutputSchema     json.RawMessage   `json:"extended_output_schema,omitempty"`
 	Responses                json.RawMessage   `json:"responses,omitempty"`
