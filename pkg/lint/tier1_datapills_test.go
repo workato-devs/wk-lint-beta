@@ -143,10 +143,10 @@ func TestDP_LHS_NO_FORMULA_TriggerFilter_Error(t *testing.T) {
 		"operand": "and",
 		"conditions": []interface{}{
 			map[string]interface{}{
-				"lhs":    `="some_value".upcase`,
+				"lhs":     `="some_value".upcase`,
 				"operand": "equals",
-				"rhs":    "SOME_VALUE",
-				"uuid":   "cond-1",
+				"rhs":     "SOME_VALUE",
+				"uuid":    "cond-1",
 			},
 		},
 	})
