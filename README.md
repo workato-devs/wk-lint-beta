@@ -45,6 +45,12 @@ wk lint recipe.json --skills-path ./skills/
 
 Also runs automatically as a pre-push gate on `wk push` — errors block the push, warnings display but don't block, `--skip-lint` to bypass.
 
+### Output
+
+Compatible `wk` versions ask the plugin to render readable per-file diagnostics and
+summaries for normal terminal output. `wk lint --json` continues to return the canonical
+structured lint result, including `exit_code`, without invoking the text renderer.
+
 ## Tiers
 
 Rules are organized into four tiers based on the analysis context they require.
