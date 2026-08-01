@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   result into stable, human-readable per-file diagnostics and summaries. Compatible
   `wk` hosts call it only for text output; `--json` continues to emit the canonical
   `lint.run` result and the renderer cannot alter the command exit code.
+- Trigger-level `filter` ("only continue if..." condition) is now a recognized field
+  on trigger steps and covered by the same Tier 1 datapill checks (`DP_VALID_JSON`,
+  `DP_LHS_NO_FORMULA`, `DP_INTERPOLATION_SINGLE`, etc.) already applied to an if-block's
+  `input.conditions[].lhs`. Previously this key was entirely unparsed and invisible to
+  every rule, including the general datapill walk. `filter.{field}` is also now a valid
+  custom-rule field path (see docs/rule-authoring.md#field-paths). Whether to add
+  dedicated structural rules for `filter` (vs. relying on custom rules) is an open
+  question — see the PR discussion.
 - Datapill path resolution (#22): `DP_PATH_RESOLVES` (Tier 3) flags a datapill whose `path`
   points at a field not declared in the referenced step's `extended_output_schema` — the
   "made-up field" failure mode that previously passed lint and only surfaced in the Workato
