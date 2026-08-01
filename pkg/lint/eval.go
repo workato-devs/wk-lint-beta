@@ -326,6 +326,8 @@ func resolveFieldPath(step *recipe.FlatStep, path string) (interface{}, bool) {
 		raw = step.Code.ExtendedOutputSchema
 	case "dynamicPickListSelection":
 		raw = step.Code.DynamicPickListSelection
+	case "filter":
+		raw = step.Code.Filter
 	default:
 		return nil, false
 	}

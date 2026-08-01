@@ -1,0 +1,32 @@
+{
+  "_comment": "Minimal excerpt of a real trigger step using code.filter, trimmed from a live recipe (Asana new_event -> Google Sheets). Demonstrates the shape this PR adds lint support for. Field names/values redacted/simplified; see docs/rule-authoring.md#field-paths.",
+  "number": 0,
+  "provider": "asana",
+  "name": "new_event",
+  "as": "new_event",
+  "keyword": "trigger",
+  "input": {
+    "object": "task",
+    "project_id": "<PROJECT_GID>",
+    "actions": "changed"
+  },
+  "filter": {
+    "type": "compound",
+    "operand": "and",
+    "conditions": [
+      {
+        "lhs": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"asana\",\"line\":\"new_event\",\"path\":[\"name\"]}')}",
+        "operand": "present",
+        "rhs": "",
+        "uuid": "cond-name-present"
+      },
+      {
+        "lhs": "#{_dp('{\"pill_type\":\"output\",\"provider\":\"asana\",\"line\":\"new_event\",\"path\":[\"due_on\"]}')}",
+        "operand": "present",
+        "rhs": "",
+        "uuid": "cond-due-on-present"
+      }
+    ]
+  },
+  "block": []
+}

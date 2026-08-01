@@ -137,6 +137,36 @@ func TestDP_LHS_NO_FORMULA_PureFormula_Error(t *testing.T) {
 	}
 }
 
+func TestDP_LHS_NO_FORMULA_TriggerFilter_Error(t *testing.T) {
+	filter := rawJSON(t, map[string]interface{}{
+		"type":    "compound",
+		"operand": "and",
+		"conditions": []interface{}{
+			map[string]interface{}{
+				"lhs":     `="some_value".upcase`,
+				"operand": "equals",
+				"rhs":     "SOME_VALUE",
+				"uuid":    "cond-1",
+			},
+		},
+	})
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{
+		{
+			Code: recipe.Code{
+				Keyword:  "trigger",
+				Provider: strPtr("asana"),
+				Name:     "new_event",
+				Filter:   filter,
+			},
+			JSONPointer: "/code",
+		},
+	}, nil)
+	diags := checkDatapillsWithCatchAliases(parsed, nil)
+	if !hasDiag(diags, "DP_LHS_NO_FORMULA") {
+		t.Error("expected DP_LHS_NO_FORMULA for pure formula in trigger filter condition LHS — code.filter should get the same datapill validation as an if-block's input.conditions")
+	}
+}
+
 func TestDP_LHS_NO_FORMULA_CaseInsensitiveComparison_Pass(t *testing.T) {
 	// =dp('...brand...').upcase is a datapill with .upcase transform — legitimate pattern
 	input := rawJSON(t, map[string]interface{}{
