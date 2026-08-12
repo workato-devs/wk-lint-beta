@@ -311,7 +311,7 @@
       "tier": 1,
       "level": "warn",
       "message": "Single datapill in formula mode — use interpolation mode instead",
-      "suggested_fix": "Switch from formula mode to interpolation mode for single datapill references.",
+      "suggested_fix": "Switch from formula mode to interpolation mode for single datapill references into string fields. Keep formula mode when the target field is declared array, object, number, integer or boolean — interpolation always yields a string, so removing the \"=\" would stringify the value.",
       "scope": "recipe",
       "assert": { "builtin": "check_datapills" }
     },

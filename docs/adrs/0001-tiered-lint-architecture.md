@@ -1,6 +1,7 @@
 # Recipe Linter: Tiered Validation for Workato Recipe JSON
 
 **Author(s):** Zayne Turner, Claude [role: assistant; harness: Claude Code]
+**Amended-by:** Claude [role: assistant; harness: Claude Code; model: Opus 5], dir. Heiwad Osman — August 2026
 **Amended-by:** Codex [role: assistant; harness: Codex; model: GPT-5], dir. Zayne Turner — July 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code; model: Opus 4.8], dir. Zayne Turner — June 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code], dir. Zayne Turner — March 2026
@@ -9,6 +10,7 @@
 **Implemented:** March 20, 2026 (IGM port + Tiers 2-3)
 
 **Amendments:**
+- August 11, 2026 — `DP_INTERPOLATION_SINGLE` is typed: interpolation and formula mode are not interchangeable
 - July 21, 2026 — Optional plugin-owned text renderer added; structured lint results remain canonical
 - June 16, 2026 — Linter split into standalone `recipe-lint` repo; "Where Things Live" layout corrected
 - June 12, 2026 — Tier-2 structure/flow split; recipe tree-ancestry layer
@@ -173,6 +175,21 @@ A dedicated sub-linter that walks every string value in the recipe, extracts `_d
 | `DP_NO_OUTER_PARENS` | Formula mode expressions don't use outer parentheses (except ternary) | datapill-syntax.md |
 | `DP_NO_BODY_NATIVE` | Datapill paths for native connectors don't include `["body"]` | base validation-checklist |
 | `DP_CATCH_PROVIDER` | Datapills referencing catch data use `"provider":"catch"`, not `"provider":null` | base validation-checklist |
+
+> **Amendment (August 2026): interpolation and formula mode are not interchangeable, so
+> `DP_INTERPOLATION_SINGLE` is typed.**
+> The table above frames the choice between `#{_dp(...)}` and `=_dp(...)` as a style
+> preference, and the sketch below implements it as one. It is a semantic choice:
+> interpolation always yields a string, while formula mode preserves the pill's type. On a
+> field declared `array`, `object`, `number`, `integer` or `boolean`, "drop the leading `=`"
+> converts working code into a bug. The rule now resolves the target field's declared type
+> from the step's `extended_input_schema` — falling back to the trigger's
+> `result_schema_json` for a return step's `input.result` fields — and skips non-string
+> targets. Where no schema declares the field, it behaves as originally specified.
+>
+> The `.present?`/`+` string matching in the sketch below was also superseded during
+> implementation: the live rule compares the trimmed formula body against the extracted
+> datapill span, so any method chain or concatenation exempts the value.
 
 **Implementation sketch — datapill walker:**
 

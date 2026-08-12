@@ -229,6 +229,95 @@ func TestDP_INTERPOLATION_SINGLE_MethodChain_Pass(t *testing.T) {
 	}
 }
 
+// --- DP_INTERPOLATION_SINGLE: target field type ---
+
+// dpPill is a well-formed single datapill, unwrapped.
+const dpPill = `_dp('{"pill_type":"output","provider":"p","line":"expense_call","path":["reports"]}')`
+
+// typedFieldRecipe builds a one-action recipe whose input holds value at the field
+// "target", with the step's extended_input_schema declaring that field as
+// fieldType. An empty fieldType declares no EIS at all.
+func typedFieldRecipe(t *testing.T, value, fieldType string) *recipe.ParsedRecipe {
+	t.Helper()
+	code := recipe.Code{
+		Keyword:  "action",
+		Provider: strPtr("salesforce"),
+		Input:    rawJSON(t, map[string]interface{}{"target": value}),
+	}
+	if fieldType != "" {
+		code.ExtendedInputSchema = rawJSON(t, []interface{}{
+			map[string]interface{}{"name": "target", "type": fieldType},
+		})
+	}
+	return buildParsedRecipe("test", []recipe.FlatStep{
+		{Code: code, JSONPointer: "/code/block/0"},
+	}, nil)
+}
+
+func TestDP_INTERPOLATION_SINGLE_TargetType(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		fieldType string
+		wantHit   int
+	}{
+		{"formula on string field warns", "=" + dpPill, "string", 1},
+		{"formula on undeclared field warns", "=" + dpPill, "", 1},
+		{"formula on array field skipped", "=" + dpPill, "array", 0},
+		{"formula on object field skipped", "=" + dpPill, "object", 0},
+		{"formula on number field skipped", "=" + dpPill, "number", 0},
+		{"formula on integer field skipped", "=" + dpPill, "integer", 0},
+		{"formula on boolean field skipped", "=" + dpPill, "boolean", 0},
+		{"interpolation on string field not flagged", "#{" + dpPill + "}", "string", 0},
+		{"interpolation on array field not flagged", "#{" + dpPill + "}", "array", 0},
+		{"method chain on string field not flagged", "=" + dpPill + ".present?", "string", 0},
+		{"concatenation on string field not flagged", "=" + dpPill + ` + "x"`, "string", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diags := checkDatapillsWithCatchAliases(typedFieldRecipe(t, tt.value, tt.fieldType), nil)
+			if got := countDiag(diags, "DP_INTERPOLATION_SINGLE"); got != tt.wantHit {
+				t.Errorf("DP_INTERPOLATION_SINGLE hits = %d, want %d", got, tt.wantHit)
+			}
+		})
+	}
+}
+
+// TestDP_INTERPOLATION_SINGLE_TriggerResultSchema covers a return step that declares
+// no EIS: the field types come from the trigger's result_schema_json, which is what a
+// recipe-function/skill trigger declares for the recipe's own output.
+func TestDP_INTERPOLATION_SINGLE_TriggerResultSchema(t *testing.T) {
+	resultSchema := `[{"name":"reports","label":"Reports","type":"array","of":"object"},` +
+		`{"name":"summary","label":"Summary","type":"string"}]`
+	build := func(field string) *recipe.ParsedRecipe {
+		return buildParsedRecipe("test", []recipe.FlatStep{
+			{Code: recipe.Code{
+				Keyword:  "trigger",
+				Provider: strPtr("workato_recipe_function"),
+				Name:     "execute",
+				As:       "trigger",
+				Input:    rawJSON(t, map[string]interface{}{"result_schema_json": resultSchema}),
+			}, JSONPointer: "/code"},
+			{Code: recipe.Code{
+				Keyword:  "action",
+				Provider: strPtr("workato_recipe_function"),
+				Name:     "return_result",
+				Input: rawJSON(t, map[string]interface{}{
+					"result": map[string]interface{}{field: "=" + dpPill},
+				}),
+			}, JSONPointer: "/code/block/0"},
+		}, nil)
+	}
+
+	if diags := checkDatapillsWithCatchAliases(build("reports"), nil); hasDiag(diags, "DP_INTERPOLATION_SINGLE") {
+		t.Error("unexpected DP_INTERPOLATION_SINGLE: trigger result_schema_json declares \"reports\" as array — interpolation would stringify it")
+	}
+	if diags := checkDatapillsWithCatchAliases(build("summary"), nil); !hasDiag(diags, "DP_INTERPOLATION_SINGLE") {
+		t.Error("expected DP_INTERPOLATION_SINGLE: \"summary\" is declared string, so interpolation mode is the right advice")
+	}
+}
+
 func TestDP_FORMULA_CONCAT_Warn(t *testing.T) {
 	dp1 := `_dp('{"pill_type":"output","provider":"sf","line":"s1","path":[]}')`
 	dp2 := `_dp('{"pill_type":"output","provider":"sf","line":"s2","path":[]}')`

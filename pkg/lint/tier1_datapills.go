@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/workato-devs/recipe-lint/pkg/recipe"
@@ -77,12 +78,16 @@ func checkDatapillsWithCatchAliases(parsed *recipe.ParsedRecipe, connRules map[s
 		}
 	}
 
+	// Parse the trigger's declared result schema once — it types the fields a
+	// return step writes under input.result when the step declares no EIS.
+	triggerResult := parseTriggerResultSchema(parsed)
+
 	for i := range parsed.Steps {
 		step := &parsed.Steps[i]
 		if step.Code.Input != nil {
 			basePath := step.JSONPointer + "/input"
 			recipe.WalkStringsWithContext(step.Code.Input, basePath, func(ctx recipe.StringContext) {
-				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases)...)
+				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases, triggerResult)...)
 			})
 		}
 		// Trigger-level "only continue if..." condition (code.filter). Same
@@ -91,7 +96,7 @@ func checkDatapillsWithCatchAliases(parsed *recipe.ParsedRecipe, connRules map[s
 		if step.Code.Filter != nil {
 			basePath := step.JSONPointer + "/filter"
 			recipe.WalkStringsWithContext(step.Code.Filter, basePath, func(ctx recipe.StringContext) {
-				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases)...)
+				diags = append(diags, lintDatapillStringWithCatch(ctx, step, connRules, catchAliases, triggerResult)...)
 			})
 		}
 	}
@@ -100,7 +105,7 @@ func checkDatapillsWithCatchAliases(parsed *recipe.ParsedRecipe, connRules map[s
 }
 
 // lintDatapillStringWithCatch is lintDatapillString but with pre-built catch aliases.
-func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep, connRules map[string]*ConnectorRules, catchAliases map[string]bool) []LintDiagnostic {
+func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep, connRules map[string]*ConnectorRules, catchAliases map[string]bool, triggerResult []EISField) []LintDiagnostic {
 	var diags []LintDiagnostic
 	value := ctx.Value
 
@@ -133,12 +138,15 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 
 	isFormula := strings.HasPrefix(value, "=")
 
-	// DP_INTERPOLATION_SINGLE
+	// DP_INTERPOLATION_SINGLE — only for targets that hold a string. Interpolation
+	// mode always yields a string, so on a field declared array/object/number/
+	// integer/boolean the "remove the leading =" advice would stringify a
+	// correctly-typed value.
 	if isFormula && len(datapills) == 1 {
 		dp := datapills[0]
 		trimmed := strings.TrimSpace(value[1:])
 		fullDP := value[dp.Start:dp.End]
-		if trimmed == fullDP {
+		if trimmed == fullDP && !nonStringFieldTypes[declaredFieldType(step, ctx.Pointer, triggerResult)] {
 			diags = append(diags, LintDiagnostic{
 				Level:   LevelWarn,
 				Message: "Single datapill in formula mode — use interpolation mode instead (remove leading =)",
@@ -213,6 +221,89 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 	}
 
 	return diags
+}
+
+// nonStringFieldTypes are declared field types whose value is not a string.
+// Interpolation mode ("#{...}") always resolves to a string; formula mode ("=")
+// preserves the datapill's type. A rule that recommends interpolation must not
+// fire on these targets.
+var nonStringFieldTypes = map[string]bool{
+	"array":   true,
+	"object":  true,
+	"number":  true,
+	"integer": true,
+	"boolean": true,
+}
+
+// declaredFieldType returns the type a recipe declares for the input field at
+// pointer, or "" when nothing declares it. Sources, in order: the step's
+// extended_input_schema, then — for a return step whose input.result mirrors the
+// recipe's declared output — the trigger's result_schema_json.
+func declaredFieldType(step *recipe.FlatStep, pointer string, triggerResult []EISField) string {
+	prefix := step.JSONPointer + "/input/"
+	if !strings.HasPrefix(pointer, prefix) {
+		return ""
+	}
+	segments := strings.Split(strings.TrimPrefix(pointer, prefix), "/")
+
+	eisFields, err := parseEIS(step.Code.ExtendedInputSchema)
+	if err == nil {
+		if t := lookupSchemaType(eisFields, segments); t != "" {
+			return t
+		}
+	}
+
+	if len(segments) > 1 && segments[0] == "result" {
+		return lookupSchemaType(triggerResult, segments[1:])
+	}
+	return ""
+}
+
+// lookupSchemaType walks a schema field list along segments and returns the
+// declared type of the leaf, or "" if any segment is undeclared or the schema
+// stops before the leaf (an open container). Numeric segments are array indices;
+// element fields live at the same schema level, so they are skipped — the same
+// descent DP_PATH_RESOLVES performs over an output schema.
+func lookupSchemaType(fields []EISField, segments []string) string {
+	current := fields
+	for i, seg := range segments {
+		if _, err := strconv.Atoi(seg); err == nil {
+			continue
+		}
+		field := findEISField(current, seg)
+		if field == nil {
+			return ""
+		}
+		if i == len(segments)-1 {
+			return field.Type
+		}
+		if len(field.Properties) == 0 {
+			return ""
+		}
+		current = field.Properties
+	}
+	return ""
+}
+
+// parseTriggerResultSchema parses the trigger's result_schema_json — the schema a
+// recipe-function/skill trigger declares for the recipe's own output. It is a
+// JSON-encoded string holding the same field-list shape as an EIS. Returns nil
+// when absent or unparseable.
+func parseTriggerResultSchema(parsed *recipe.ParsedRecipe) []EISField {
+	if len(parsed.Steps) == 0 || parsed.Steps[0].Code.Input == nil {
+		return nil
+	}
+	var input struct {
+		ResultSchemaJSON string `json:"result_schema_json"`
+	}
+	if err := json.Unmarshal(parsed.Steps[0].Code.Input, &input); err != nil || input.ResultSchemaJSON == "" {
+		return nil
+	}
+	fields, err := parseEIS(json.RawMessage(input.ResultSchemaJSON))
+	if err != nil {
+		return nil
+	}
+	return fields
 }
 
 // containsBody checks if a datapill path contains "body".

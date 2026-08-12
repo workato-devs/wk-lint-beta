@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `DP_INTERPOLATION_SINGLE` is now aware of the target field's declared type. It
+  previously fired on any single-pill formula-mode value and told the author to drop
+  the leading `=`; on a field declared `array`, `object`, `number`, `integer` or
+  `boolean` that advice stringifies a correctly-typed value, because interpolation
+  mode always yields a string. The rule now resolves the field type from the step's
+  `extended_input_schema` — falling back to the trigger's `result_schema_json` for a
+  return step's `input.result` fields — and skips non-string targets. Behavior is
+  unchanged for string fields and for fields no schema declares. The suggested fix
+  names the type constraint.
+
 ## [1.1.0] -- 2026-08-01
 
 ### Added
