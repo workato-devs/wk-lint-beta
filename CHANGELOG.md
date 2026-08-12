@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `DP_BARE_UNWRAPPED` (Tier 1, error): a `_dp('{...}')` value that is neither wrapped
+  in `#{...}` nor prefixed with `=` is never resolved — the platform emits the literal
+  `_dp('{...}')` characters as the field value. Recipes shipped this way push, activate
+  and run green while returning pill text to the caller, and no rule flagged it. The
+  check runs per string value and skips occurrences already inside a `#{...}` wrapper,
+  so a mixed concatenation flags only the unwrapped pill.
+
 ### Fixed
 
 - `DP_INTERPOLATION_SINGLE` is now aware of the target field's declared type. It

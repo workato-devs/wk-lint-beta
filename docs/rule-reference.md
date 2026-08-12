@@ -49,10 +49,19 @@ Checks each step for internal correctness without needing to know about other st
 
 ### Datapill Rules
 
+How the platform reads a recipe input value depends on its first characters:
+
+| Value | Mode | Result |
+|-------|------|--------|
+| `#{_dp('{...}')}` | interpolation | resolves; **always a string** |
+| `=_dp('{...}')` | formula | resolves; **preserves the pill's type** (array, object, number, boolean) |
+| `_dp('{...}')` | neither | never resolves; emitted as literal text |
+
 | Rule ID | Description | Default |
 |---------|-------------|---------|
 | `DP_LHS_NO_FORMULA` | Condition `lhs` (left-hand side) should use datapill interpolation, not formula mode | warn |
 | `DP_VALID_JSON` | `_dp()` payload must be parseable JSON | error |
+| `DP_BARE_UNWRAPPED` | A `_dp()` call that is neither wrapped in `#{...}` nor prefixed with `=` is never resolved — the platform emits the literal `_dp('{...}')` text as the field value | error |
 | `DP_INTERPOLATION_SINGLE` | A single datapill into a **string** field should use `#{_dp(...)}` interpolation, not `=_dp(...)` formula mode. Skipped when the target field is declared `array`, `object`, `number`, `integer` or `boolean` — interpolation always yields a string, so formula mode is what preserves the pill's type | warn |
 | `DP_FORMULA_CONCAT` | Multiple datapills should use formula mode with `+` concatenation, not `#{}` interpolation | warn |
 | `DP_NO_OUTER_PARENS` | Formula expressions should not be wrapped in unnecessary outer parentheses | info |

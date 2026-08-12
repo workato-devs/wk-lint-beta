@@ -33,6 +33,7 @@
     "FORMULA_METHOD_INVALID": "warn",
     "FORMULA_FORBIDDEN_PATTERN": "warn",
     "DP_VALID_JSON": "error",
+    "DP_BARE_UNWRAPPED": "error",
     "DP_LHS_NO_FORMULA": "warn",
     "DP_INTERPOLATION_SINGLE": "warn",
     "DP_FORMULA_CONCAT": "warn",

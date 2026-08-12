@@ -53,6 +53,7 @@ func TestBuiltinRules_Load(t *testing.T) {
 		"ACTION_NAME_VALID",
 		"ACTION_RULES",
 		"DP_VALID_JSON",
+		"DP_BARE_UNWRAPPED",
 		"DP_LHS_NO_FORMULA",
 		"DP_INTERPOLATION_SINGLE",
 		"DP_FORMULA_CONCAT",

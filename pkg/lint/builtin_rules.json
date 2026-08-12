@@ -298,6 +298,15 @@
       "assert": { "builtin": "check_datapills" }
     },
     {
+      "rule_id": "DP_BARE_UNWRAPPED",
+      "tier": 1,
+      "level": "error",
+      "message": "Datapill is neither interpolated nor in formula mode — it is emitted as literal text",
+      "suggested_fix": "Wrap the datapill in \"#{...}\" to interpolate it into a string, or prefix the value with \"=\" for formula mode, which preserves the pill's type (array, object, number, boolean). An unwrapped _dp('{...}') is never resolved — the recipe runs and returns the literal characters.",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
       "rule_id": "DP_LHS_NO_FORMULA",
       "tier": 1,
       "level": "warn",

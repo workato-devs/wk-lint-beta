@@ -138,6 +138,25 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 
 	isFormula := strings.HasPrefix(value, "=")
 
+	// DP_BARE_UNWRAPPED — a datapill that is neither interpolated nor in formula
+	// mode is not evaluated at all: the platform emits the literal characters
+	// _dp('{...}') as the field value. One diagnostic per string value.
+	if !isFormula {
+		for _, dp := range datapills {
+			if isInsideInterpolation(value, dp.Start) {
+				continue
+			}
+			diags = append(diags, LintDiagnostic{
+				Level:   LevelError,
+				Message: "Datapill is neither interpolated nor in formula mode — it is emitted as literal text",
+				Source:  &SourceRef{JSONPointer: ctx.Pointer},
+				RuleID:  "DP_BARE_UNWRAPPED",
+				Tier:    1,
+			})
+			break
+		}
+	}
+
 	// DP_INTERPOLATION_SINGLE — only for targets that hold a string. Interpolation
 	// mode always yields a string, so on a field declared array/object/number/
 	// integer/boolean the "remove the leading =" advice would stringify a
@@ -221,6 +240,19 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 	}
 
 	return diags
+}
+
+// isInsideInterpolation reports whether the datapill starting at index start sits
+// inside a "#{...}" wrapper. It looks back for the nearest "#{" and rejects it if a
+// "}" closes it before the datapill begins — so in
+// `#{_dp('{...}')} and _dp('{...}')` only the second occurrence is bare. The braces
+// of the pill's own JSON payload sit after start and cannot affect the result.
+func isInsideInterpolation(value string, start int) bool {
+	open := strings.LastIndex(value[:start], "#{")
+	if open < 0 {
+		return false
+	}
+	return !strings.Contains(value[open+2:start], "}")
 }
 
 // nonStringFieldTypes are declared field types whose value is not a string.

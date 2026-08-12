@@ -78,6 +78,7 @@ Baseline profile. Most rules emit warnings; schema violations and structural inv
 | `FORMULA_METHOD_INVALID` | warning |
 | `FORMULA_FORBIDDEN_PATTERN` | warning |
 | `DP_VALID_JSON` | error |
+| `DP_BARE_UNWRAPPED` | error |
 | `DP_LHS_NO_FORMULA` | warning |
 | `DP_INTERPOLATION_SINGLE` | warning |
 | `DP_FORMULA_CONCAT` | warning |

@@ -318,6 +318,77 @@ func TestDP_INTERPOLATION_SINGLE_TriggerResultSchema(t *testing.T) {
 	}
 }
 
+// --- DP_BARE_UNWRAPPED ---
+
+func TestDP_BARE_UNWRAPPED(t *testing.T) {
+	second := `_dp('{"pill_type":"output","provider":"p","line":"other_call","path":["id"]}')`
+
+	tests := []struct {
+		name    string
+		value   string
+		wantHit int
+	}{
+		{"bare pill flagged", dpPill, 1},
+		{"bare pill in text flagged", "Report: " + dpPill, 1},
+		{"interpolated pill not flagged", "#{" + dpPill + "}", 0},
+		{"interpolated pill in text not flagged", "Report: #{" + dpPill + "} (end)", 0},
+		{"formula pill not flagged", "=" + dpPill, 0},
+		{"formula concatenation not flagged", "=" + dpPill + " + " + second, 0},
+		{"two interpolated pills not flagged", "#{" + dpPill + "} and #{" + second + "}", 0},
+		{"interpolated then bare flagged once", "#{" + dpPill + "} and " + second, 1},
+		{"no datapill not flagged", "just a plain string", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diags := checkDatapillsWithCatchAliases(typedFieldRecipe(t, tt.value, "string"), nil)
+			if got := countDiag(diags, "DP_BARE_UNWRAPPED"); got != tt.wantHit {
+				t.Errorf("DP_BARE_UNWRAPPED hits = %d, want %d", got, tt.wantHit)
+			}
+		})
+	}
+}
+
+// TestDP_BARE_UNWRAPPED_ReturnResult reproduces the shipped failure: a return step
+// whose input holds an unwrapped datapill. The recipe pushes, activates and runs
+// green — the caller receives the literal characters _dp('{...}').
+func TestDP_BARE_UNWRAPPED_ReturnResult(t *testing.T) {
+	build := func(value string) *recipe.ParsedRecipe {
+		return buildParsedRecipe("test", []recipe.FlatStep{
+			{Code: recipe.Code{
+				Keyword:  "action",
+				Provider: strPtr("workato_recipe_function"),
+				Name:     "return_result",
+				Input: rawJSON(t, map[string]interface{}{
+					"result": map[string]interface{}{"reports": value},
+				}),
+				ExtendedInputSchema: rawJSON(t, []interface{}{
+					map[string]interface{}{
+						"name": "result",
+						"type": "object",
+						"properties": []interface{}{
+							map[string]interface{}{"name": "reports", "type": "array"},
+						},
+					},
+				}),
+			}, JSONPointer: "/code/block/0"},
+		}, nil)
+	}
+
+	broken := checkDatapillsWithCatchAliases(build(dpPill), nil)
+	if !hasDiag(broken, "DP_BARE_UNWRAPPED") {
+		t.Error("expected DP_BARE_UNWRAPPED for an unwrapped datapill in a return step")
+	}
+
+	fixed := checkDatapillsWithCatchAliases(build("="+dpPill), nil)
+	if hasDiag(fixed, "DP_BARE_UNWRAPPED") {
+		t.Error("unexpected DP_BARE_UNWRAPPED for the formula-mode fix")
+	}
+	if hasDiag(fixed, "DP_INTERPOLATION_SINGLE") {
+		t.Error("unexpected DP_INTERPOLATION_SINGLE: the target field is declared array, so formula mode is what preserves the type")
+	}
+}
+
 func TestDP_FORMULA_CONCAT_Warn(t *testing.T) {
 	dp1 := `_dp('{"pill_type":"output","provider":"sf","line":"s1","path":[]}')`
 	dp2 := `_dp('{"pill_type":"output","provider":"sf","line":"s2","path":[]}')`

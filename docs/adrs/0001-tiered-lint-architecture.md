@@ -10,6 +10,7 @@
 **Implemented:** March 20, 2026 (IGM port + Tiers 2-3)
 
 **Amendments:**
+- August 11, 2026 — A third, non-resolving datapill form exists; `DP_BARE_UNWRAPPED` added
 - August 11, 2026 — `DP_INTERPOLATION_SINGLE` is typed: interpolation and formula mode are not interchangeable
 - July 21, 2026 — Optional plugin-owned text renderer added; structured lint results remain canonical
 - June 16, 2026 — Linter split into standalone `recipe-lint` repo; "Where Things Live" layout corrected
@@ -190,6 +191,15 @@ A dedicated sub-linter that walks every string value in the recipe, extracts `_d
 > The `.present?`/`+` string matching in the sketch below was also superseded during
 > implementation: the live rule compares the trimmed formula body against the extracted
 > datapill span, so any method chain or concatenation exempts the value.
+
+> **Amendment (August 2026): a value carries three datapill forms, not two.**
+> Both forms in the table above resolve. A third does not: a value that merely *contains*
+> `_dp('{...}')` — no `#{}` wrapper, no `=` prefix — is not read as a datapill at all, and the
+> platform emits the literal `_dp('{...}')` characters as the field value. Recipes in this
+> state push, activate and run green while handing pill text to the caller, so nothing
+> downstream flags them either. `DP_BARE_UNWRAPPED` (Tier 1, error) covers this form: it runs
+> per string value and skips occurrences already inside a `#{...}` wrapper, so a mixed
+> concatenation flags only the unwrapped pill.
 
 **Implementation sketch — datapill walker:**
 
