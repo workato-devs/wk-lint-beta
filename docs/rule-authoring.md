@@ -81,6 +81,7 @@ Baseline profile. Most rules emit warnings; schema violations and structural inv
 | `DP_BARE_UNWRAPPED` | error |
 | `DP_LHS_NO_FORMULA` | warning |
 | `DP_INTERPOLATION_SINGLE` | warning |
+| `DP_INTERPOLATION_TYPED` | warning |
 | `DP_FORMULA_CONCAT` | warning |
 | `DP_NO_OUTER_PARENS` | info |
 | `DP_NO_BODY_NATIVE` | warning |

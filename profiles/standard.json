@@ -36,6 +36,7 @@
     "DP_BARE_UNWRAPPED": "error",
     "DP_LHS_NO_FORMULA": "warn",
     "DP_INTERPOLATION_SINGLE": "warn",
+    "DP_INTERPOLATION_TYPED": "warn",
     "DP_FORMULA_CONCAT": "warn",
     "DP_NO_OUTER_PARENS": "info",
     "DP_NO_BODY_NATIVE": "warn",

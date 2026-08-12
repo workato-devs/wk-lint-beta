@@ -176,6 +176,32 @@ func lintDatapillStringWithCatch(ctx recipe.StringContext, step *recipe.FlatStep
 		}
 	}
 
+	// DP_INTERPOLATION_TYPED — the inverse of DP_INTERPOLATION_SINGLE. Interpolation
+	// mode always yields a string, so a lone pill wrapped in "#{...}" on a field
+	// declared array/object/number/integer/boolean hands the platform a stringified
+	// value. Such a recipe pushes, lints clean and runs green; only the caller sees
+	// the wrong type. Restricted to a value that is exactly the wrapped pill: any
+	// surrounding literal text makes the field a string by construction, and formula
+	// mode is not the fix for it.
+	if !isFormula && len(datapills) == 1 {
+		dp := datapills[0]
+		fullDP := value[dp.Start:dp.End]
+		if value == "#{"+fullDP+"}" {
+			if fieldType := declaredFieldType(step, ctx.Pointer, triggerResult); nonStringFieldTypes[fieldType] {
+				diags = append(diags, LintDiagnostic{
+					Level: LevelWarn,
+					Message: fmt.Sprintf(
+						"Datapill interpolated into a field declared %s — interpolation always yields a string; use formula mode (=) to preserve the type",
+						fieldType,
+					),
+					Source: &SourceRef{JSONPointer: ctx.Pointer},
+					RuleID: "DP_INTERPOLATION_TYPED",
+					Tier:   1,
+				})
+			}
+		}
+	}
+
 	// DP_FORMULA_CONCAT
 	if !isFormula && len(datapills) >= 2 && strings.Contains(value, "#{") {
 		diags = append(diags, LintDiagnostic{

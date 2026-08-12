@@ -325,6 +325,15 @@
       "assert": { "builtin": "check_datapills" }
     },
     {
+      "rule_id": "DP_INTERPOLATION_TYPED",
+      "tier": 1,
+      "level": "warn",
+      "message": "Datapill interpolated into a non-string field — the value is stringified",
+      "suggested_fix": "Replace \"#{_dp('{...}')}\" with \"=_dp('{...}')\". Interpolation mode always yields a string; formula mode preserves the pill's declared type (array, object, number, integer, boolean). The recipe pushes, lints and runs green either way — only the caller sees the wrong type.",
+      "scope": "recipe",
+      "assert": { "builtin": "check_datapills" }
+    },
+    {
       "rule_id": "DP_FORMULA_CONCAT",
       "tier": 1,
       "level": "warn",

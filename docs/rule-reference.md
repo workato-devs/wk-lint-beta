@@ -63,6 +63,7 @@ How the platform reads a recipe input value depends on its first characters:
 | `DP_VALID_JSON` | `_dp()` payload must be parseable JSON | error |
 | `DP_BARE_UNWRAPPED` | A `_dp()` call that is neither wrapped in `#{...}` nor prefixed with `=` is never resolved — the platform emits the literal `_dp('{...}')` text as the field value | error |
 | `DP_INTERPOLATION_SINGLE` | A single datapill into a **string** field should use `#{_dp(...)}` interpolation, not `=_dp(...)` formula mode. Skipped when the target field is declared `array`, `object`, `number`, `integer` or `boolean` — interpolation always yields a string, so formula mode is what preserves the pill's type | warn |
+| `DP_INTERPOLATION_TYPED` | A single datapill interpolated as `#{_dp(...)}` into a field declared `array`, `object`, `number`, `integer` or `boolean` is stringified — interpolation always yields a string, so formula mode (`=`) is what preserves the pill's type | warn |
 | `DP_FORMULA_CONCAT` | Multiple datapills should use formula mode with `+` concatenation, not `#{}` interpolation | warn |
 | `DP_NO_OUTER_PARENS` | Formula expressions should not be wrapped in unnecessary outer parentheses | info |
 | `DP_NO_BODY_NATIVE` | Datapill paths for native connectors should not include `["body"]` | warn |

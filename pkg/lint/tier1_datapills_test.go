@@ -318,6 +318,95 @@ func TestDP_INTERPOLATION_SINGLE_TriggerResultSchema(t *testing.T) {
 	}
 }
 
+// --- DP_INTERPOLATION_TYPED ---
+
+func TestDP_INTERPOLATION_TYPED(t *testing.T) {
+	second := `_dp('{"pill_type":"output","provider":"p","line":"other_call","path":["id"]}')`
+	wrapped := "#{" + dpPill + "}"
+
+	tests := []struct {
+		name      string
+		value     string
+		fieldType string
+		wantHit   int
+	}{
+		{"interpolation on array field flagged", wrapped, "array", 1},
+		{"interpolation on object field flagged", wrapped, "object", 1},
+		{"interpolation on number field flagged", wrapped, "number", 1},
+		{"interpolation on integer field flagged", wrapped, "integer", 1},
+		{"interpolation on boolean field flagged", wrapped, "boolean", 1},
+
+		{"interpolation on string field not flagged", wrapped, "string", 0},
+		{"interpolation on undeclared field not flagged", wrapped, "", 0},
+
+		// Formula mode is the fix, not the defect.
+		{"formula on array field not flagged", "=" + dpPill, "array", 0},
+		// A bare pill is DP_BARE_UNWRAPPED's case, not this rule's.
+		{"bare pill on array field not flagged", dpPill, "array", 0},
+		// Surrounding literal text makes the field a string by construction —
+		// formula mode would not fix it, so the rule must stay silent.
+		{"interpolation with leading text not flagged", "Report: " + wrapped, "array", 0},
+		{"interpolation with trailing text not flagged", wrapped + " (end)", "array", 0},
+		{"two interpolated pills not flagged", wrapped + " and #{" + second + "}", "array", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diags := checkDatapillsWithCatchAliases(typedFieldRecipe(t, tt.value, tt.fieldType), nil)
+			if got := countDiag(diags, "DP_INTERPOLATION_TYPED"); got != tt.wantHit {
+				t.Errorf("DP_INTERPOLATION_TYPED hits = %d, want %d", got, tt.wantHit)
+			}
+		})
+	}
+}
+
+// TestDP_INTERPOLATION_TYPED_TriggerResultSchema covers the shape this rule was
+// written for: a return step declaring no EIS, whose field types come from the
+// trigger's result_schema_json. Interpolating into the array field hands the caller
+// a stringified array while the job still reports success.
+func TestDP_INTERPOLATION_TYPED_TriggerResultSchema(t *testing.T) {
+	resultSchema := `[{"name":"reports","label":"Reports","type":"array","of":"object"},` +
+		`{"name":"summary","label":"Summary","type":"string"}]`
+	build := func(field, value string) *recipe.ParsedRecipe {
+		return buildParsedRecipe("test", []recipe.FlatStep{
+			{Code: recipe.Code{
+				Keyword:  "trigger",
+				Provider: strPtr("workato_recipe_function"),
+				Name:     "execute",
+				As:       "trigger",
+				Input:    rawJSON(t, map[string]interface{}{"result_schema_json": resultSchema}),
+			}, JSONPointer: "/code"},
+			{Code: recipe.Code{
+				Keyword:  "action",
+				Provider: strPtr("workato_recipe_function"),
+				Name:     "return_result",
+				Input: rawJSON(t, map[string]interface{}{
+					"result": map[string]interface{}{field: value},
+				}),
+			}, JSONPointer: "/code/block/0"},
+		}, nil)
+	}
+
+	wrapped := "#{" + dpPill + "}"
+
+	if diags := checkDatapillsWithCatchAliases(build("reports", wrapped), nil); !hasDiag(diags, "DP_INTERPOLATION_TYPED") {
+		t.Error("expected DP_INTERPOLATION_TYPED: trigger result_schema_json declares \"reports\" as array, so interpolation stringifies it")
+	}
+	if diags := checkDatapillsWithCatchAliases(build("summary", wrapped), nil); hasDiag(diags, "DP_INTERPOLATION_TYPED") {
+		t.Error("unexpected DP_INTERPOLATION_TYPED: \"summary\" is declared string, so interpolation is correct")
+	}
+
+	// The suggested fix must clear this rule without tripping its sibling — the two
+	// rules are inverses and must not both fire on the same field.
+	fixed := checkDatapillsWithCatchAliases(build("reports", "="+dpPill), nil)
+	if hasDiag(fixed, "DP_INTERPOLATION_TYPED") {
+		t.Error("unexpected DP_INTERPOLATION_TYPED for the formula-mode fix")
+	}
+	if hasDiag(fixed, "DP_INTERPOLATION_SINGLE") {
+		t.Error("unexpected DP_INTERPOLATION_SINGLE: the fix for one rule must not be flagged by the other")
+	}
+}
+
 // --- DP_BARE_UNWRAPPED ---
 
 func TestDP_BARE_UNWRAPPED(t *testing.T) {

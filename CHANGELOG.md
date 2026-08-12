@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check runs per string value and skips occurrences already inside a `#{...}` wrapper,
   so a mixed concatenation flags only the unwrapped pill.
 
+- `DP_INTERPOLATION_TYPED` (Tier 1, warning): the inverse of the fix below. A lone datapill
+  wrapped in `#{...}` on a field declared `array`, `object`, `number`, `integer` or `boolean`
+  is stringified, because interpolation mode always yields a string. The recipe pushes, lints
+  clean and runs green; only the caller sees the wrong type. Fires only when the value is
+  exactly the wrapped pill — surrounding literal text makes the field a string by
+  construction, and formula mode is not the fix for that. Reuses the declared-type resolution
+  introduced for `DP_INTERPOLATION_SINGLE` (`extended_input_schema`, falling back to the
+  trigger's `result_schema_json` for a return step's `input.result` fields).
+
 ### Fixed
 
 - `DP_INTERPOLATION_SINGLE` is now aware of the target field's declared type. It
