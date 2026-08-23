@@ -1,6 +1,7 @@
 # Recipe Linter: Tiered Validation for Workato Recipe JSON
 
 **Author(s):** Zayne Turner, Claude [role: assistant; harness: Claude Code]
+**Amended-by:** Codex [role: assistant; harness: Codex; model: GPT-5] — August 2026
 **Amended-by:** Codex [role: assistant; harness: Codex; model: GPT-5], dir. Zayne Turner — July 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code; model: Opus 4.8], dir. Zayne Turner — June 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code], dir. Zayne Turner — March 2026
@@ -9,6 +10,7 @@
 **Implemented:** March 20, 2026 (IGM port + Tiers 2-3)
 
 **Amendments:**
+- August 23, 2026 — Connector-declared action output schemas added for Tier 3; `TRY_NO_AS` retired after canonical-export evidence contradicted it
 - July 21, 2026 — Optional plugin-owned text renderer added; structured lint results remain canonical
 - June 16, 2026 — Linter split into standalone `recipe-lint` repo; "Where Things Live" layout corrected
 - June 12, 2026 — Tier-2 structure/flow split; recipe tree-ancestry layer
@@ -157,6 +159,12 @@ This is the tier where the **false negatives live**. Datapill syntax rules, `lhs
 | `NO_ELSIF` | No step uses `keyword: "elsif"` | if-else.md |
 | `RESPONSE_CODES_DEFINED` | For API endpoint triggers, all `return_response` status codes appear in trigger `responses` | api-endpoint.md |
 | `PICK_LIST_MATCH` | `extended_input_schema` `pick_list` on `return_response` matches trigger response names exactly | SKILL_INSTRUCTIONS |
+
+> **Amendment (August 2026): `TRY_NO_AS` is retired.** Current Workato canonical exports and
+> builder readback legitimately materialize a platform-generated alias on `try` blocks. The
+> original row above encoded an authoring preference as a platform invariant and produced an
+> unfixable strict-profile error. `catch` aliases remain required; `try` aliases are accepted
+> whether absent or platform-generated.
 
 #### 1b: Datapill Validation (the hard part)
 

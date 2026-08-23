@@ -153,6 +153,76 @@ func TestEIS_NO_CONNECTOR_INTERNAL_Warn(t *testing.T) {
 	}
 }
 
+func TestEIS_RESTConnectorInternals_NoFalsePositive(t *testing.T) {
+	eis := json.RawMessage(`[{"name":"response","type":"object"}]`)
+	input := rawJSON(t, map[string]interface{}{
+		"response":                     map[string]interface{}{"output_type": "json"},
+		"request":                      map[string]interface{}{"method": "GET"},
+		"request_name":                 "Get project build",
+		"disable_retries":              true,
+		"wait_for_response":            false,
+		"enable_streaming":             false,
+		"completion_threshold_seconds": 120,
+	})
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{{
+		Code: recipe.Code{
+			Keyword:             "action",
+			Provider:            strPtr("rest"),
+			Name:                "make_request_v2",
+			Input:               input,
+			ExtendedInputSchema: eis,
+		},
+		JSONPointer: "/code/block/0",
+	}}, nil)
+	connRules := map[string]*ConnectorRules{
+		"rest": {
+			ActionInternals: map[string][]string{
+				"make_request_v2": {
+					"completion_threshold_seconds",
+					"disable_retries",
+					"enable_streaming",
+					"request",
+					"request_name",
+					"wait_for_response",
+				},
+			},
+		},
+	}
+
+	for _, d := range checkEIS(parsed, connRules) {
+		if d.RuleID == "EIS_MIRRORS_INPUT" {
+			t.Errorf("unexpected EIS_MIRRORS_INPUT for REST connector field: %s", d.Message)
+		}
+	}
+}
+
+func TestEIS_ActionInternalsDoNotApplyToTrigger(t *testing.T) {
+	eis := json.RawMessage(`[{"name":"request","type":"object"}]`)
+	parsed := buildParsedRecipe("test", []recipe.FlatStep{{
+		Code: recipe.Code{
+			Keyword:             "trigger",
+			Provider:            strPtr("rest"),
+			Name:                "new_poll_event",
+			Input:               rawJSON(t, map[string]interface{}{"request": map[string]interface{}{"path": "events"}}),
+			ExtendedInputSchema: eis,
+		},
+		JSONPointer: "/code",
+	}}, nil)
+	connRules := map[string]*ConnectorRules{
+		"rest": {
+			ActionInternals: map[string][]string{
+				"make_request_v2": {"request"},
+			},
+		},
+	}
+
+	for _, d := range checkEIS(parsed, connRules) {
+		if d.RuleID == "EIS_NO_CONNECTOR_INTERNAL" {
+			t.Errorf("action-scoped internal must not apply to trigger: %s", d.Message)
+		}
+	}
+}
+
 func TestEIS_OUTPUT_MIRRORS_INPUT_Info(t *testing.T) {
 	eis := json.RawMessage(`[{"name":"result","label":"Result","type":"string"},{"name":"status","label":"Status","type":"string"}]`)
 	eos := json.RawMessage(`[{"name":"result","label":"Result","type":"string"}]`)
@@ -182,10 +252,10 @@ func TestEIS_OUTPUT_MIRRORS_INPUT_Info(t *testing.T) {
 func TestEIS_PyEvalPlatformFields_NoFalsePositive(t *testing.T) {
 	eis := json.RawMessage(`[{"name":"code_input","label":"Input fields","type":"object","properties":[{"name":"schema","type":"string"},{"name":"data","type":"object"}]}]`)
 	input := rawJSON(t, map[string]interface{}{
-		"code":                     "def main(input):\n    return {'result': input['text']}\n",
-		"code_input":               map[string]interface{}{"data": map[string]interface{}{"text": "hello"}},
-		"code_output_schema_json":  `[{"name":"result","type":"string"}]`,
-		"name":                     "Reverse text",
+		"code":                    "def main(input):\n    return {'result': input['text']}\n",
+		"code_input":              map[string]interface{}{"data": map[string]interface{}{"text": "hello"}},
+		"code_output_schema_json": `[{"name":"result","type":"string"}]`,
+		"name":                    "Reverse text",
 	})
 	parsed := buildParsedRecipe("test", []recipe.FlatStep{
 		{

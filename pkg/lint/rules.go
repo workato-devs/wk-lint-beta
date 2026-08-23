@@ -8,13 +8,25 @@ import (
 
 // ConnectorRules holds lint rules specific to a connector.
 type ConnectorRules struct {
-	Version            string       `json:"version"`
-	Connector          string       `json:"connector"`
-	ConnectorInternals []string     `json:"connector_internals"`
-	ValidActionNames   []string     `json:"valid_action_names,omitempty"`
-	ValidTriggerNames  []string     `json:"valid_trigger_names,omitempty"`
-	ActionRules        []ActionRule   `json:"action_rules"`
-	Rules              []CustomRule   `json:"rules,omitempty"`
+	Version             string                     `json:"version"`
+	Connector           string                     `json:"connector"`
+	ConnectorInternals  []string                   `json:"connector_internals"`
+	ActionInternals     map[string][]string        `json:"action_internals,omitempty"`
+	ValidActionNames    []string                   `json:"valid_action_names,omitempty"`
+	ValidTriggerNames   []string                   `json:"valid_trigger_names,omitempty"`
+	ActionRules         []ActionRule               `json:"action_rules"`
+	ActionOutputSchemas map[string]json.RawMessage `json:"action_output_schemas,omitempty"`
+	Rules               []CustomRule               `json:"rules,omitempty"`
+}
+
+// ActionOutputSchema describes output fields guaranteed by a connector action.
+// Static actions declare their complete output in Fields. Dynamic actions may
+// declare only IntrinsicFields that Workato always exposes in addition to any
+// recipe-materialized response schema.
+type ActionOutputSchema struct {
+	Kind            string     `json:"kind"`
+	Fields          []EISField `json:"fields,omitempty"`
+	IntrinsicFields []EISField `json:"intrinsic_fields,omitempty"`
 }
 
 // ActionRule defines a single connector-specific lint rule.

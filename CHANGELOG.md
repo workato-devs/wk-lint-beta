@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Connector-declared action output contracts for `DP_PATH_RESOLVES` (#24). Static action schemas can close absent recipe EOS, while dynamic actions can declare stable intrinsic transport fields that augment partial canonical exports without opening recipe-declared response trees. Existing connector files remain compatible and malformed or unknown declarations fail conservatively.
+- Action-scoped `action_internals` metadata so connector-owned input fields can be excluded from EIS checks without weakening other actions or triggers on the same provider.
+
+### Fixed
+
+- Retired `TRY_NO_AS`: current canonical Workato exports legitimately materialize platform-generated aliases on `try` blocks, so the rule produced an unfixable false positive.
+- Threaded connector rule data into Tier 3 so audited connector schemas can resolve datapill paths omitted from canonical recipe EOS.
+
 ## [1.1.0] -- 2026-08-01
 
 ### Added

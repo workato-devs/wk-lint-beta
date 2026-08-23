@@ -25,7 +25,6 @@
     "ELSE_NO_PROVIDER": "warn",
     "CATCH_PROVIDER_NULL": "warn",
     "CATCH_HAS_AS": "warn",
-    "TRY_NO_AS": "warn",
     "REPEAT_NO_PROVIDER": "warn",
     "WHILE_CONDITION_NO_PROVIDER": "warn",
     "CATCH_HAS_RETRY": "info",

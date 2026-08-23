@@ -40,7 +40,6 @@ func TestBuiltinRules_Load(t *testing.T) {
 		"ELSE_NO_PROVIDER",
 		"CATCH_PROVIDER_NULL",
 		"CATCH_HAS_AS",
-		"TRY_NO_AS",
 		"CATCH_HAS_RETRY",
 		"NO_ELSIF",
 		"STEP_NUMBERING",
@@ -248,7 +247,7 @@ func TestBuiltinRule_CatchHasAs_Fail(t *testing.T) {
 	}
 }
 
-func TestBuiltinRule_TryNoAs_Pass(t *testing.T) {
+func TestBuiltinRules_TryWithoutAlias_Pass(t *testing.T) {
 	parsed := buildParsedRecipe("test", []recipe.FlatStep{
 		{Code: recipe.Code{Keyword: "try", As: ""}, JSONPointer: "/code/block/0"},
 	}, nil)
@@ -258,13 +257,13 @@ func TestBuiltinRule_TryNoAs_Pass(t *testing.T) {
 	}
 }
 
-func TestBuiltinRule_TryNoAs_Fail(t *testing.T) {
+func TestBuiltinRules_CanonicalTryAlias_Pass(t *testing.T) {
 	parsed := buildParsedRecipe("test", []recipe.FlatStep{
-		{Code: recipe.Code{Keyword: "try", As: "something"}, JSONPointer: "/code/block/0"},
+		{Code: recipe.Code{Keyword: "try", As: "try_c176"}, JSONPointer: "/code/block/0"},
 	}, nil)
 	diags := evalBuiltinRulesForTest(t, parsed)
-	if !hasDiag(diags, "TRY_NO_AS") {
-		t.Error("expected TRY_NO_AS when try has non-empty as")
+	if hasDiag(diags, "TRY_NO_AS") {
+		t.Error("canonical Workato-generated try alias must not be rejected")
 	}
 }
 

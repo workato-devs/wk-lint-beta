@@ -1,6 +1,7 @@
 # Rules Are Data, Not Code
 
 **Author(s):** Zayne Turner, Claude [role: assistant; harness: Claude Code; model: Opus 4.8]
+**Amended-by:** Codex [role: assistant; harness: Codex; model: GPT-5] — August 2026
 **Amended-by:** Claude [role: assistant; harness: Claude Code; model: Opus 4.8], dir. Zayne Turner — June 2026
 
 **Status:** Accepted
@@ -9,6 +10,7 @@
 **References:** ADR 0001 (Tiered Validation Architecture); Labs repo `labs/docs/adrs/LABS-0001-skills-lint-rules-as-data.md` (skills-side rules contract)
 
 **Amendments:**
+- August 2026 — Added connector-declared action output schemas to the cross-repo `lint-rules.json` contract; retired the data-defined `TRY_NO_AS` false positive
 - June 2026 — Recorded the `lint-rules.json` contract's downstream consumer (the agent-skills repo) and pointed to the Labs-repo ADR that owns that cross-repo decision.
 - June 2026 — Added the `check_return_response_schema` builtin (issue #17), taking the builtin count from 27 to 28; recorded that issue #18 is addressed as recipe-skills allowlist data (no rule in this binary).
 - June 2026 — Added the `DP_PATH_RESOLVES` rule (issue #22), backed by Go via the existing `check_dataflow` builtin (no new `RegisterBuiltin`; registered-builtin count stays 28). Grows the Go-backed rule-ID surface — debt counted deliberately.
@@ -144,5 +146,27 @@ The principle is that the declarative path is the default and the `builtin` path
 >   is a candidate for the "expand the declarative vocabulary vs. accept bounded builtins as
 >   legitimate" decision this ADR already flagged under Follow-on work, since connector-schema
 >   data is exactly the "rules as data" path.
+
+> **Amendment (August 2026): connector output contracts complete the bounded `DP_PATH_RESOLVES` v2 path.**
+> Live Workato REST connector metadata and stopped canonical recipe exports established two
+> simultaneous facts: the connector exposes stable transport outputs such as `status_code`, and a
+> recipe export can contain a non-empty but partial EOS that omits those connector-owned roots.
+> Therefore the earlier fallback-only proposal (use connector data only when EOS is absent) was
+> insufficient. The additive cross-repo contract now supports per-action `static` or `dynamic`
+> schemas plus explicit `intrinsic_fields`. Recipe EOS remains authoritative for roots it declares;
+> audited intrinsic roots may augment it; static connector schemas close absent EOS; dynamic
+> schemas validate known intrinsics while accepting unknown runtime output conservatively.
+> `ConnectorRules` stores each action declaration as raw JSON so one malformed or unknown action
+> does not disable sibling connector data. Triggers remain unchanged. The rule continues to use
+> the existing `check_dataflow` builtin, so registered-builtin count does not grow.
+> The same additive contract includes `action_internals` for connector-owned input fields that are
+> specific to one action; provider-wide `connector_internals` remains compatible. This prevents an
+> input exemption proven for one action from silently weakening EIS checks on sibling actions or
+> triggers.
+>
+> The same evidence retired `TRY_NO_AS`. It was declarative data, but it asserted a platform
+> invariant contradicted by current canonical exports, which legitimately contain generated `try`
+> aliases. Removing a false rule is consistent with the rules-as-data contract; connector/runtime
+> evidence, not a stale preference, controls the catalog.
 
 <!-- When this evolves, add a dated amendment in place; do not rewrite the above. -->

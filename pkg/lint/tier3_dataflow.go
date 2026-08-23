@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 // lintTier3DataFlow runs Tier 3 cross-step data flow rules using the IGM alias map.
-func lintTier3DataFlow(parsed *recipe.ParsedRecipe, graph *igm.Graph) []LintDiagnostic {
+func lintTier3DataFlow(parsed *recipe.ParsedRecipe, graph *igm.Graph, connRules map[string]*ConnectorRules) []LintDiagnostic {
 	var diags []LintDiagnostic
 
 	// Build step providers map: nodeID → provider
@@ -45,7 +46,7 @@ func lintTier3DataFlow(parsed *recipe.ParsedRecipe, graph *igm.Graph) []LintDiag
 				diags = append(diags, checkDPProviderMatches(dp.Payload, pointer, graph.AliasMap, stepProviders)...)
 				diags = append(diags, checkDPStepReachable(dp.Payload, pointer, step, graph, reachableFrom)...)
 				diags = append(diags, checkDPTriggerPath(dp.Payload, pointer, parsed)...)
-				diags = append(diags, checkDPPathResolves(dp.Payload, pointer, aliasToStep)...)
+				diags = append(diags, checkDPPathResolves(dp.Payload, pointer, aliasToStep, connRules)...)
 			}
 		})
 	}
@@ -184,30 +185,112 @@ func checkDPTriggerPath(payload *DatapillPayload, pointer string, parsed *recipe
 }
 
 // checkDPPathResolves verifies that a datapill's path resolves to a field declared in the
-// referenced step's extended_output_schema (EOS). Conservative, recipe-EOS-only:
+// referenced step's output schema. The recipe's extended_output_schema (EOS)
+// remains authoritative where it declares a root. Connector-declared intrinsic
+// fields may augment a partial recipe EOS, and connector action schemas may be
+// used conservatively when a recipe does not materialize an EOS:
 //   - Skips when the line is unresolved (owned by DP_LINE_RESOLVES) — no double-flag.
-//   - Skips when the target step declares no EOS (absent/dynamic schema → can't validate).
+//   - Applies connector fallback only to action steps with a known provider/action.
+//   - Static connector schemas are closed; dynamic schemas validate only their
+//     known intrinsic fields and accept unknown runtime-defined roots.
+//   - Skips unknown/malformed connector declarations for forward compatibility.
 //   - Stops and accepts at any open container (an object/array field with no declared
 //     properties) — a dynamic/raw-JSON subtree whose shape isn't materialized in the recipe.
 //   - Ignores numeric path segments (array indices); array element fields live under properties.
 //
 // Rule: DP_PATH_RESOLVES
-func checkDPPathResolves(payload *DatapillPayload, pointer string, aliasToStep map[string]*recipe.FlatStep) []LintDiagnostic {
+func checkDPPathResolves(payload *DatapillPayload, pointer string, aliasToStep map[string]*recipe.FlatStep, connRules map[string]*ConnectorRules) []LintDiagnostic {
 	if payload.Line == "" {
 		return nil
+	}
+	if len(payload.Path) == 0 {
+		return nil // reference to the step's whole output
+	}
+	if firstPathName(payload.Path) == "" {
+		return nil // no named field to validate
 	}
 	step, ok := aliasToStep[payload.Line]
 	if !ok {
 		return nil // unresolved alias — owned by DP_LINE_RESOLVES
 	}
 
-	fields, err := parseEIS(step.Code.ExtendedOutputSchema)
-	if err != nil || len(fields) == 0 {
-		return nil // absent/dynamic/unparseable schema → accept
+	recipeFields, err := parseEIS(step.Code.ExtendedOutputSchema)
+	if err != nil {
+		return nil // malformed recipe EOS remains conservative
 	}
 
+	connectorSchema, connectorSchemaOK := actionOutputSchemaForStep(step, connRules)
+
+	// A materialized recipe EOS owns every root it declares. Connector intrinsic
+	// fields can augment it because Workato canonical exports may omit those stable
+	// transport outputs (for example REST status_code) while retaining response.
+	if len(recipeFields) > 0 {
+		if firstPathName(payload.Path) != "" && findEISField(recipeFields, firstPathName(payload.Path)) != nil {
+			return dpPathDiagnostic(payload, pointer, recipeFields)
+		}
+		if connectorSchemaOK && pathRootDeclared(connectorSchema.IntrinsicFields, payload.Path) {
+			return dpPathDiagnostic(payload, pointer, connectorSchema.IntrinsicFields)
+		}
+		return missingDPPathDiagnostic(payload, pointer, firstPathName(payload.Path))
+	}
+
+	if !connectorSchemaOK {
+		return nil
+	}
+
+	switch connectorSchema.Kind {
+	case "static":
+		fields := append(append([]EISField(nil), connectorSchema.Fields...), connectorSchema.IntrinsicFields...)
+		return dpPathDiagnostic(payload, pointer, fields)
+	case "dynamic":
+		if !pathRootDeclared(connectorSchema.IntrinsicFields, payload.Path) {
+			return nil
+		}
+		return dpPathDiagnostic(payload, pointer, connectorSchema.IntrinsicFields)
+	default:
+		return nil
+	}
+}
+
+func actionOutputSchemaForStep(step *recipe.FlatStep, connRules map[string]*ConnectorRules) (ActionOutputSchema, bool) {
+	if step.Code.Keyword != "action" || step.Code.Provider == nil || step.Code.Name == "" || connRules == nil {
+		return ActionOutputSchema{}, false
+	}
+	rules, ok := connRules[*step.Code.Provider]
+	if !ok || rules == nil {
+		return ActionOutputSchema{}, false
+	}
+	raw, ok := rules.ActionOutputSchemas[step.Code.Name]
+	if !ok || len(raw) == 0 {
+		return ActionOutputSchema{}, false
+	}
+	var schema ActionOutputSchema
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return ActionOutputSchema{}, false
+	}
+	if schema.Kind != "static" && schema.Kind != "dynamic" {
+		return ActionOutputSchema{}, false
+	}
+	return schema, true
+}
+
+func firstPathName(path []interface{}) string {
+	for _, seg := range path {
+		if name, ok := seg.(string); ok {
+			return name
+		}
+	}
+	return ""
+}
+
+func pathRootDeclared(fields []EISField, path []interface{}) bool {
+	root := firstPathName(path)
+	return root != "" && findEISField(fields, root) != nil
+}
+
+func dpPathDiagnostic(payload *DatapillPayload, pointer string, fields []EISField) []LintDiagnostic {
 	current := fields
-	for _, seg := range payload.Path {
+	for i, seg := range payload.Path {
 		name, isStr := seg.(string)
 		if !isStr {
 			// numeric array index (or other non-string) — element fields are at the
@@ -216,22 +299,31 @@ func checkDPPathResolves(payload *DatapillPayload, pointer string, aliasToStep m
 		}
 		field := findEISField(current, name)
 		if field == nil {
-			return []LintDiagnostic{{
-				Level:   LevelWarn,
-				Message: fmt.Sprintf("Datapill path field %q is not declared in step %q extended_output_schema", name, payload.Line),
-				Source:  &SourceRef{JSONPointer: pointer},
-				RuleID:  "DP_PATH_RESOLVES",
-				Tier:    3,
-			}}
+			return missingDPPathDiagnostic(payload, pointer, name)
 		}
 		if len(field.Properties) == 0 {
-			// Leaf, or an open container with no declared properties — cannot verify
-			// any deeper, so accept the remaining path.
+			// Open object/array containers accept runtime-defined descendants. Scalar
+			// leaves reject a subsequent named segment. Empty field types stay
+			// conservative for older connector files.
+			nextName := firstPathName(payload.Path[i+1:])
+			if nextName != "" && field.Type != "" && field.Type != "object" && field.Type != "array" {
+				return missingDPPathDiagnostic(payload, pointer, nextName)
+			}
 			return nil
 		}
 		current = field.Properties
 	}
 	return nil
+}
+
+func missingDPPathDiagnostic(payload *DatapillPayload, pointer, name string) []LintDiagnostic {
+	return []LintDiagnostic{{
+		Level:   LevelWarn,
+		Message: fmt.Sprintf("Datapill path field %q is not declared in step %q output schema", name, payload.Line),
+		Source:  &SourceRef{JSONPointer: pointer},
+		RuleID:  "DP_PATH_RESOLVES",
+		Tier:    3,
+	}}
 }
 
 // findEISField returns the field with the given name (exact match) from a field list, or nil.

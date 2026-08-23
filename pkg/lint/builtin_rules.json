@@ -150,16 +150,6 @@
       "assert": { "field_exists": { "path": "as" } }
     },
     {
-      "rule_id": "TRY_NO_AS",
-      "tier": 1,
-      "level": "warn",
-      "message": "\"try\" step should have an empty \"as\" field",
-      "suggested_fix": "Remove the \"as\" field from the try step — only the catch step should have an alias.",
-      "scope": "step",
-      "where": { "keyword": "try" },
-      "assert": { "field_absent": { "path": "as" } }
-    },
-    {
       "rule_id": "REPEAT_NO_PROVIDER",
       "tier": 1,
       "level": "warn",
@@ -621,8 +611,8 @@
       "rule_id": "DP_PATH_RESOLVES",
       "tier": 3,
       "level": "warn",
-      "message": "Datapill path field is not declared in the referenced step's extended_output_schema",
-      "suggested_fix": "Reference a field declared in the step's extended_output_schema, or correct the datapill path. Only validated when the step materializes a schema in the recipe; dynamic/open schemas are skipped.",
+      "message": "Datapill path field is not declared in the referenced step's output schema",
+      "suggested_fix": "Reference a field declared by the recipe output schema or an audited connector output schema, or correct the datapill path. Dynamic/open output remains conservatively accepted where no closed schema is available.",
       "scope": "recipe",
       "assert": { "builtin": "check_dataflow" }
     }

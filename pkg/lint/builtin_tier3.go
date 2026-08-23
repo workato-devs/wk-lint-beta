@@ -6,7 +6,7 @@ func init() {
 			return nil
 		}
 		allDiags := ctx.CacheGetOrCompute("check_dataflow", func() interface{} {
-			return lintTier3DataFlow(ctx.Parsed, ctx.Graph)
+			return lintTier3DataFlow(ctx.Parsed, ctx.Graph, ctx.ConnRules)
 		}).([]LintDiagnostic)
 		var filtered []LintDiagnostic
 		for _, d := range allDiags {

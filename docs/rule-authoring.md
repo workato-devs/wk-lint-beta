@@ -119,7 +119,6 @@ Rules where `standard` and `strict` differ are shown below. Rules not listed are
 | `ELSE_NO_PROVIDER` | 1 | warn | **error** |
 | `CATCH_PROVIDER_NULL` | 1 | warn | **error** |
 | `CATCH_HAS_AS` | 1 | warn | **error** |
-| `TRY_NO_AS` | 1 | warn | **error** |
 | `REPEAT_NO_PROVIDER` | 1 | warn | **error** |
 | `WHILE_CONDITION_NO_PROVIDER` | 1 | warn | **error** |
 | `CATCH_HAS_RETRY` | 1 | info | **warn** |
@@ -430,8 +429,10 @@ The v0.1.0 format is the original connector-specific schema. It remains fully su
 | `version` | string | yes | Schema version (`"0.1.0"`). |
 | `connector` | string | yes | Provider name as it appears in recipe `provider` fields. |
 | `connector_internals` | string[] | yes | Fields excluded from EIS checks (`EIS_NO_CONNECTOR_INTERNAL`). Use `[]` if none. |
+| `action_internals` | object | no | Connector-owned input fields keyed by action name. Prefer this over provider-wide internals when fields are action-specific. |
 | `valid_action_names` | string[] | no | Allowed action names for `ACTION_NAME_VALID`. Omit or empty to skip. |
 | `action_rules` | array | yes | Connector-specific check rules. Use `[]` if none. |
+| `action_output_schemas` | object | no | Audited output contracts keyed by action name for `DP_PATH_RESOLVES`. See below. |
 
 **Action rule fields:**
 
@@ -444,6 +445,50 @@ The v0.1.0 format is the original connector-specific schema. It remains fully su
 | `eis_must_be_empty` | bool | If true, EIS must be empty for this action. |
 | `field_type_checks` | map | Field name to `{"type": "...", "parse_output": "..."}`. |
 | `message` | string | Diagnostic message. Supports `{field_name}` and `{missing_location}` placeholders. |
+
+**Action output schemas:**
+
+Connector files may add an `action_output_schemas` object without changing their existing
+`version` value. The field is additive; older files and older linter binaries ignore it.
+
+```json
+{
+  "action_output_schemas": {
+    "fixed_action": {
+      "kind": "static",
+      "fields": [
+        {
+          "name": "result",
+          "type": "object",
+          "properties": [{"name": "id", "type": "string"}]
+        }
+      ]
+    },
+    "dynamic_action": {
+      "kind": "dynamic",
+      "intrinsic_fields": [
+        {"name": "status_code", "type": "string"}
+      ]
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `kind` | `static` or `dynamic` | A static schema is closed. A dynamic action may expose runtime-defined fields. Unknown kinds are skipped for forward compatibility. |
+| `fields` | schema field[] | Complete output schema for a static action. Nested `properties` use the same shape as Workato EOS. |
+| `intrinsic_fields` | schema field[] | Stable connector-owned roots available independently of a recipe-materialized response schema. |
+
+Resolution precedence is deliberately conservative:
+
+1. A non-empty, parseable recipe EOS owns every root it declares.
+2. Audited `intrinsic_fields` may augment a partial recipe EOS; they do not replace or open its declared response tree.
+3. With no recipe EOS, a `static` connector schema is validated as closed.
+4. With no recipe EOS, a `dynamic` connector schema validates known intrinsic roots and accepts unknown runtime-defined roots.
+5. Missing providers/actions/schemas, malformed per-action declarations, triggers, and open nested containers are skipped rather than guessed.
+
+Connector output data must come from current Workato connector metadata, UI schemas, or verified canonical exports—not prose or vendor API documentation. Each skill should record that provenance in `_notes`.
 
 ### Mixed Format (v0.2.0 with connector data)
 

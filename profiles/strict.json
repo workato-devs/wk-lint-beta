@@ -16,7 +16,6 @@
     "ELSE_NO_PROVIDER": "error",
     "CATCH_PROVIDER_NULL": "error",
     "CATCH_HAS_AS": "error",
-    "TRY_NO_AS": "error",
     "REPEAT_NO_PROVIDER": "error",
     "WHILE_CONDITION_NO_PROVIDER": "error",
     "CATCH_HAS_RETRY": "warn",

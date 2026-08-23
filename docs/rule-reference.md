@@ -39,7 +39,6 @@ Checks each step for internal correctness without needing to know about other st
 | `CATCH_PROVIDER_NULL` | `"catch"` steps should have `"provider": null` | warn |
 | `CATCH_HAS_AS` | `"catch"` steps must have a non-empty `"as"` field | warn |
 | `CATCH_HAS_RETRY` | `"catch"` step input should include `max_retry_count` | info |
-| `TRY_NO_AS` | `"try"` steps should have an empty `"as"` field | warn |
 | `REPEAT_NO_PROVIDER` | `"repeat"` (loop) steps should not have a `provider` field | warn |
 | `WHILE_CONDITION_NO_PROVIDER` | `"while_condition"` steps should not have a `provider`, `name`, or `as` field | warn |
 | `NO_ELSIF` | `"elsif"` keyword is not allowed; use nested if/else instead | error |
@@ -119,7 +118,7 @@ Resolves datapill references across steps using the control flow graph and step 
 | `DP_PROVIDER_MATCHES` | Datapill `provider` must match the resolved step's actual provider | warn |
 | `DP_STEP_REACHABLE` | The step referenced by a datapill must be reachable in the control flow graph | warn |
 | `DP_TRIGGER_PATH` | API endpoint datapill paths should start with `"request"` | info |
-| `DP_PATH_RESOLVES` | Datapill `path` must resolve to a field declared in the referenced step's `extended_output_schema` (recipe-EOS-only; dynamic/open schemas are skipped) | warn |
+| `DP_PATH_RESOLVES` | Datapill `path` must resolve against the recipe EOS and any audited connector output contract; dynamic/open output is accepted conservatively | warn |
 
 ## Custom Rule Loading
 

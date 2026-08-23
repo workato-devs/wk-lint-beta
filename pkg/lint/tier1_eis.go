@@ -95,6 +95,11 @@ func getConnectorInternals(step recipe.FlatStep, connRules map[string]*Connector
 	for _, name := range cr.ConnectorInternals {
 		internals[name] = true
 	}
+	if step.Code.Keyword == "action" {
+		for _, name := range cr.ActionInternals[step.Code.Name] {
+			internals[name] = true
+		}
+	}
 	return internals
 }
 
